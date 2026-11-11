@@ -1,31 +1,13 @@
-// Webhook de Telegram: responde a los comandos al instante.
+// Webhook de Telegram (comandos al instante) y cron (avisos y tareas de GitHub).
 import { handleCommand } from "./commands.js";
+import { runScheduled } from "./cron.js";
+import { marketContext, todayNewYork } from "./context.js";
 import { PORTFOLIO } from "./config.js";
 import { fetchBars } from "./market.js";
-import { classifyRegime } from "./regime.js";
 import { loadState, saveState } from "./store.js";
 import { sendMessage } from "./telegram.js";
 
 const CANDIDATES_URL = "https://raw.githubusercontent.com/mcelimenia-create/trading/main/docs/data/candidates.json";
-
-function todayNewYork() {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date());
-}
-
-async function marketContext() {
-  const spec = PORTFOLIO.regime;
-  const [index, growth, vix] = await Promise.all([
-    fetchBars(spec.index, "2y"), fetchBars(spec.growth_index, "2y"), fetchBars(spec.volatility, "1mo"),
-  ]).catch(() => [[], [], []]);
-  const regime = classifyRegime(
-    index.map((b) => b.close),
-    growth.map((b) => b.close),
-    vix.length ? vix[vix.length - 1].close : NaN,
-    PORTFOLIO,
-  );
-  const fx = await fetchBars(spec.fx, "1mo").then((b) => b[b.length - 1].close).catch(() => null);
-  return { regime, fx };
-}
 
 async function candidates() {
   const res = await fetch(CANDIDATES_URL);
@@ -51,8 +33,19 @@ async function processText(text, env) {
   return result.reply;
 }
 
+// Estado de las posiciones reales para la copia de GitHub (lo lee el job session).
+function serveState(request, env) {
+  if (request.headers.get("Authorization") !== `Bearer ${env.SYNC_TOKEN}`) {
+    return new Response("forbidden", { status: 403 });
+  }
+  return loadState(env.DB).then((state) => Response.json(state));
+}
+
 export default {
   async fetch(request, env) {
+    if (request.method === "GET") {
+      return new URL(request.url).pathname === "/state" ? serveState(request, env) : new Response("ok");
+    }
     if (request.method !== "POST") return new Response("ok");
     if (request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== env.WEBHOOK_SECRET) {
       return new Response("forbidden", { status: 403 });
@@ -70,5 +63,9 @@ export default {
     }
     await sendMessage(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_CHAT_ID, reply);
     return new Response("ok");
+  },
+
+  scheduled(event, env, ctx) {
+    ctx.waitUntil(runScheduled(env, event.scheduledTime));
   },
 };

@@ -1,21 +1,14 @@
 name: trader-bot
 
 on:
-  schedule:
-    # Minutos distintos para que dos tareas programadas no coincidan: GitHub descarta la que espera.
-    - cron: "5 7,13,18,21 * * *"   # noticias, varias veces al dia (UTC)
-    - cron: "*/15 13-21 * * 1-5"   # sesion de mercado, dias laborables (UTC)
-    - cron: "35 21 * * 1-5"        # cartera de papel, tras el cierre (UTC)
-    - cron: "50 21 * * 1-5"        # candidatos de medio plazo, tras el cierre (UTC)
-    - cron: "0 22 * * 5"           # escaner de EEUU, cada viernes (UTC)
-    # Telegram: lo atiende el Worker de Cloudflare (webhook); el cron de GitHub se quito.
+  # Las tareas las lanza el Worker de Cloudflare (cron cada 5 minutos) con workflow_dispatch.
   workflow_dispatch:
     inputs:
       job:
         description: "Tarea a ejecutar"
         type: choice
-        default: telegram
-        options: [telegram, news, session, paper, candidates, scan]
+        default: news
+        options: [news, session, paper, candidates, scan]
 
 permissions:
   contents: write
@@ -29,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      JOB: ${{ github.event_name == 'workflow_dispatch' && inputs.job || github.event.schedule == '*/15 13-21 * * 1-5' && 'session' || github.event.schedule == '35 21 * * 1-5' && 'paper' || github.event.schedule == '50 21 * * 1-5' && 'candidates' || github.event.schedule == '0 22 * * 5' && 'scan' || github.event.schedule == '1,6,11,16,21,26,31,36,41,46,51,56 * * * *' && 'telegram' || 'news' }}
+      JOB: ${{ inputs.job }}
     steps:
       - uses: actions/checkout@v4
 
@@ -47,13 +40,14 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          SYNC_TOKEN: ${{ secrets.SYNC_TOKEN }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           STATE_KEY: ${{ secrets.STATE_KEY }}
           TRADER_DIR: ${{ runner.temp }}/bot-state/trader
         run: python3 scripts/trader_bot.py "$JOB"
 
       - name: Publicar panel (docs/data)
-        if: always() && !cancelled() && (env.JOB == 'news' || env.JOB == 'paper' || env.JOB == 'candidates' || env.JOB == 'telegram')
+        if: always() && !cancelled() && (env.JOB == 'news' || env.JOB == 'session' || env.JOB == 'paper' || env.JOB == 'candidates')
         run: |
           git config user.name "trader-bot"
           git config user.email "trader-bot@users.noreply.github.com"

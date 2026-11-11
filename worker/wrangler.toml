@@ -6,3 +6,6 @@ compatibility_date = "2026-11-01"
 binding = "DB"
 database_name = "trading-bot-db"
 database_id = "11dd28c1-8c42-4d28-b3cb-dece66a014b5"
+
+[triggers]
+crons = ["*/5 * * * *"]

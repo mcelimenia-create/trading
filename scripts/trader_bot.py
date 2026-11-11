@@ -4,6 +4,7 @@
     python3 scripts/trader_bot.py news      # noticias de la lista vigilada
     python3 scripts/trader_bot.py session   # operacion de 1 dia: entrada, plan, simulacion, salida
     python3 scripts/trader_bot.py paper     # cartera de papel de la regla de precio (sin dinero real)
+    python3 scripts/trader_bot.py candidates|scan  # candidatos de medio plazo y escaner de EEUU
 
 Solo lee datos publicos y envia avisos. Nunca envia ordenes a un broker.
 """
@@ -22,12 +23,9 @@ from zoneinfo import ZoneInfo
 import candidates
 import catalysts
 import fundamentals
-import real_crypto
 import paper_trader
-import real_positions
-import regime
+import real_crypto
 import scanner
-import telegram_io
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS_DIR = ROOT / "skills"
@@ -36,7 +34,8 @@ CONFIG_FILE = ROOT / "config" / "watchlist.json"
 ENV_FILE = ROOT / ".env"
 PAPER_FILE = TRADER_DIR / "paper.json"
 REAL_FILE = TRADER_DIR / "real.json"
-OFFSET_FILE = TRADER_DIR / "telegram_offset.json"
+EARNINGS_FILE = TRADER_DIR / "earnings_alerted.json"
+WORKER_STATE_URL = "https://trading-bot.mcelimen-ia.workers.dev/state"
 REAL_DIGEST_FILE = TRADER_DIR / "real_published.sha256"
 REAL_PUBLIC_FILE = ROOT / "docs" / "data" / "real.enc"
 CANDIDATE_CONFIG = ROOT / "config" / "candidates.json"
@@ -176,7 +175,36 @@ def watch_day_trade(ticker, notify):
         notify(f"OPERACION 1 DIA - SALIDA / AVISO {ticker}\n\n{result.stdout}")
 
 
+def sync_real_positions():
+    """Copia las posiciones reales de la base del Worker a trader/real.json (para cifrarlas en el panel)."""
+    token = os.environ.get("SYNC_TOKEN", "")
+    if not token:
+        raise RuntimeError("falta SYNC_TOKEN: no puedo leer las posiciones reales del Worker")
+    request = urllib.request.Request(WORKER_STATE_URL, headers={"Authorization": f"Bearer {token}"})
+    with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_S) as response:
+        state = json.loads(response.read().decode("utf-8"))
+    REAL_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+
+def earnings_alerts(notify):
+    """Resultados proximos de las posiciones reales. Un aviso por valor y dia."""
+    today = datetime.now(NEW_YORK).strftime("%Y-%m-%d")
+    symbols = [p["symbol"] for p in load_json(REAL_FILE, {"open": []})["open"]]
+    soon = catalysts.earnings_soon(symbols, today, load_portfolio()["earnings_window_days"],
+                                   os.environ.get("FINNHUB_API_KEY", "")) or []
+    sent = load_json(EARNINGS_FILE, {})
+    pending = [(symbol, day) for symbol, day in soon if sent.get(symbol) != today]
+    if not pending:
+        return
+    notify("RESULTADOS PROXIMOS: " + ", ".join(f"{symbol} el {day}" for symbol, day in pending)
+           + ". Revisa la tesis antes.")
+    sent.update({symbol: today for symbol, _ in pending})
+    EARNINGS_FILE.write_text(json.dumps(sent), encoding="utf-8")
+
+
 def session_job(notify):
+    sync_real_positions()
+    earnings_alerts(notify)
     today = datetime.now(NEW_YORK).strftime("%Y-%m-%d")
     marker = TRADER_DIR / f"trade-{today}.json"
     if marker.exists():
@@ -193,72 +221,8 @@ def load_json(path, default):
     return json.loads(path.read_text(encoding="utf-8")) if path.exists() else default
 
 
-def telegram_job(notify, token, chat_id):
-    """Cada 15 minutos: lee tus mensajes, registra posiciones reales y avisa de la regla de salida."""
-    offset = load_json(OFFSET_FILE, {"offset": 0})["offset"]
-    updates = telegram_io.get_updates(token, offset)
-    state = load_json(REAL_FILE, real_positions.empty_real_state())
-    replies = []
-    messages = telegram_io.text_messages(updates, chat_id)
-    print(f"telegram: updates={len(updates)} mensajes_del_chat={len(messages)} offset={offset}")
-    market = market_context_or_none() if messages else None
-    for update_id, text in messages:
-        state, reply = real_positions.handle_command(state, text, real_fetch, market=market)
-        replies.append(reply)
-        OFFSET_FILE.write_text(json.dumps({"offset": update_id + 1}), encoding="utf-8")
-    if messages:
-        replies += portfolio_warnings(state)
-    state, alerts = real_positions.monitor(state, real_fetch)
-    state, review = real_positions.weekly_review(state, datetime.now(NEW_YORK).strftime("%Y-%m-%d"))
-    if review:
-        replies.append(review)
-    REAL_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
-    for reply in replies:
-        notify(reply)
-    if alerts:
-        notify("\n".join(alerts))
-    if updates:
-        OFFSET_FILE.write_text(json.dumps({"offset": max(u["update_id"] for u in updates) + 1}), encoding="utf-8")
-
-
-def real_fetch(symbol):
-    return paper_trader.fetch_bars(symbol)
-
-
 def load_portfolio():
     return json.loads(PORTFOLIO_FILE.read_text(encoding="utf-8"))
-
-
-def load_candidates():
-    if not CANDIDATES_PUBLIC_FILE.exists():
-        return []
-    return json.loads(CANDIDATES_PUBLIC_FILE.read_text(encoding="utf-8"))["candidates"]
-
-
-def market_context():
-    cfg = load_portfolio()
-    state, fx = regime.fetch_context(cfg)
-    return {"cfg": cfg, "fx": fx, "state": state["state"], "exposure_factor": state["exposure_factor"],
-            "candidates": load_candidates()}
-
-
-def market_context_or_none():
-    """Si falla el contexto de mercado, los comandos que no lo necesitan siguen funcionando."""
-    try:
-        return market_context()
-    except (OSError, ValueError, KeyError) as error:
-        print(f"Sin contexto de mercado: {error}", file=sys.stderr)
-        return None
-
-
-def portfolio_warnings(state):
-    cfg = load_portfolio()
-    today = datetime.now(NEW_YORK).strftime("%Y-%m-%d")
-    found = real_positions.limit_warnings(state, cfg, today, regime.fx_usd_per_eur(cfg))
-    symbols = [p["symbol"] for p in state["open"]]
-    soon = catalysts.earnings_soon(symbols, today, cfg["earnings_window_days"], os.environ.get("FINNHUB_API_KEY", ""))
-    found += [f"resultados de {symbol} el {day}: revisa la tesis antes" for symbol, day in soon or []]
-    return [f"AVISO DE CARTERA: {w}" for w in found]
 
 
 def scan_job(notify):
@@ -315,10 +279,10 @@ def publish_dashboard(job, ok=True):
 def main(argv):
     jobs = {
         "news": news_job, "session": session_job, "paper": paper_job,
-        "candidates": candidates_job, "scan": scan_job, "telegram": None,
+        "candidates": candidates_job, "scan": scan_job,
     }
     if len(argv) != 2 or argv[1] not in jobs:
-        print("Uso: trader_bot.py news|session|paper|candidates|scan|telegram", file=sys.stderr)
+        print("Uso: trader_bot.py news|session|paper|candidates|scan", file=sys.stderr)
         return 2
     env = {**load_env(ENV_FILE), **os.environ}
     token = env.get("TELEGRAM_BOT_TOKEN")
@@ -332,18 +296,9 @@ def main(argv):
         send_telegram(token, chat_id, text)
 
     try:
-        if argv[1] == "telegram":
-            try:
-                telegram_job(notify, token, chat_id)
-            except Exception:
-                try:
-                    publish_real()
-                except RuntimeError as publish_error:
-                    print(f"Sin publicar posiciones reales: {publish_error}", file=sys.stderr)
-                raise
+        jobs[argv[1]](notify)
+        if argv[1] == "session":
             publish_real()
-        else:
-            jobs[argv[1]](notify)
     except Exception as error:
         report_failure(argv[1], error, notify)
         if argv[1] in DASHBOARD_JOBS:
