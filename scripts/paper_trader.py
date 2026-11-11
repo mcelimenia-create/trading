@@ -34,7 +34,7 @@ COST = 0.002
 DISCLAIMER = "PAPEL: simulacion. No es una orden ni una recomendacion personal."
 
 
-def fetch_bars(symbol, span="2y"):
+def fetch_bars(symbol, span="5y"):
     url = PAPER_URL.format(symbol=urllib.parse.quote(symbol, safe=""), span=span)
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_S) as response:
@@ -82,6 +82,9 @@ def empty_state():
 def fill_pending(state, symbol, bars, dates):
     events = []
     for pending in [p for p in state["pending"] if p["symbol"] == symbol]:
+        if pending["signal_date"] not in dates:
+            state["pending"].remove(pending)
+            continue
         later = [j for j, d in enumerate(dates) if d > pending["signal_date"]]
         if not later:
             continue
@@ -115,6 +118,8 @@ def exit_for_bar(bars, start, k, stop):
 def manage_positions(state, symbol, bars, dates):
     events = []
     for position in [p for p in state["positions"] if p["symbol"] == symbol]:
+        if position["entry_date"] not in dates:
+            continue
         start = dates.index(position["entry_date"])
         for k in range(start, len(bars)):
             found = exit_for_bar(bars, start, k, position["stop"])

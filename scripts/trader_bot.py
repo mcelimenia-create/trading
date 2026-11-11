@@ -64,11 +64,13 @@ def run_skill(script, args, ok_codes):
 
 def split_messages(text):
     chunks, current = [], ""
-    for line in text.splitlines(keepends=True):
-        if len(current) + len(line) > TELEGRAM_MAX_CHARS:
+    pieces = [piece for line in text.splitlines(keepends=True)
+              for piece in (line[i:i + TELEGRAM_MAX_CHARS] for i in range(0, len(line), TELEGRAM_MAX_CHARS))]
+    for piece in pieces:
+        if len(current) + len(piece) > TELEGRAM_MAX_CHARS:
             chunks.append(current)
             current = ""
-        current += line
+        current += piece
     if current:
         chunks.append(current)
     return chunks
