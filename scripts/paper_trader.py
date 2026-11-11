@@ -143,6 +143,8 @@ def add_new_signal(state, symbol, bars, dates):
         return []
     if any(p["symbol"] == symbol for p in state["pending"] + state["positions"]):
         return []
+    if any(c["symbol"] == symbol and c["signal_date"] == dates[last] for c in state["closed"]):
+        return []
     stop_estimate = bars[last]["close"] - ATR_MULT * atr(bars, last)
     pending = {"symbol": symbol, "signal_date": dates[last], "signal_close": bars[last]["close"],
                "stop_estimate": stop_estimate}

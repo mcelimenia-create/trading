@@ -25,7 +25,7 @@ import telegram_io
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS_DIR = ROOT / "skills"
-TRADER_DIR = ROOT / "trader"
+TRADER_DIR = Path(os.environ.get("TRADER_DIR") or ROOT / "trader")
 CONFIG_FILE = ROOT / "config" / "watchlist.json"
 ENV_FILE = ROOT / ".env"
 PAPER_FILE = TRADER_DIR / "paper.json"
@@ -214,12 +214,21 @@ def candidates_job(notify):
     candidates.candidates_job(notify, tickers, CANDIDATES_PUBLIC_FILE)
 
 
-def publish_dashboard(job):
+def report_failure(job, error, notify):
+    """Avisa por Telegram de un fallo. Si Telegram tampoco responde, el error original sigue su curso."""
+    try:
+        notify(f"FALLO del bot (tarea {job}): {error}")
+    except OSError as send_error:
+        print(f"No pude avisar del fallo por Telegram: {send_error}", file=sys.stderr)
+
+
+def publish_dashboard(job, ok=True):
     """Copia el estado de papel y la hora de la ultima ejecucion a docs/data (panel de GitHub Pages)."""
     DOCS_DATA_DIR.mkdir(parents=True, exist_ok=True)
     status_path = DOCS_DATA_DIR / "status.json"
     status = json.loads(status_path.read_text(encoding="utf-8")) if status_path.exists() else {}
-    status[job] = datetime.now(ZoneInfo("UTC")).strftime("%Y-%m-%d %H:%M UTC")
+    stamp = datetime.now(ZoneInfo("UTC")).strftime("%Y-%m-%d %H:%M UTC")
+    status[job] = stamp if ok else f"{stamp} (fallo)"
     status_path.write_text(json.dumps(status, indent=2), encoding="utf-8")
     if job == "paper" and PAPER_FILE.exists():
         (DOCS_DATA_DIR / "paper.json").write_text(PAPER_FILE.read_text(encoding="utf-8"), encoding="utf-8")
@@ -244,10 +253,16 @@ def main(argv):
     def notify(text):
         send_telegram(token, chat_id, text)
 
-    if argv[1] == "telegram":
-        telegram_job(notify, token, chat_id)
-    else:
-        jobs[argv[1]](notify)
+    try:
+        if argv[1] == "telegram":
+            telegram_job(notify, token, chat_id)
+        else:
+            jobs[argv[1]](notify)
+    except Exception as error:
+        report_failure(argv[1], error, notify)
+        if argv[1] in DASHBOARD_JOBS:
+            publish_dashboard(argv[1], ok=False)
+        raise
     if argv[1] in DASHBOARD_JOBS:
         publish_dashboard(argv[1])
     return 0
