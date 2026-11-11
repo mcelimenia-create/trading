@@ -24,16 +24,16 @@ remote_head() {
   fi
   if [ "$rc" -ne 0 ]; then
     echo "No pude consultar el remoto (codigo $rc)" >&2
-    exit 1
+    return 1
   fi
-  git fetch --quiet --depth 1 origin "$BRANCH"
+  git fetch --quiet --depth 1 origin "$BRANCH" || return 1
   git rev-parse FETCH_HEAD
 }
 
 restore() {
   require_key
   local head tmp
-  head="$(remote_head)"
+  head="$(remote_head)" || exit 1
   if [ -z "$head" ]; then
     echo "Rama $BRANCH no existe: empiezo con estado vacio"
     mkdir -p "$STATE_DIR/trader"
@@ -50,7 +50,7 @@ restore() {
 # Crea un commit sobre la rama state actual y lo sube. Devuelve error si otro run subio antes.
 push_state() {
   local parent tree commit
-  parent="$(remote_head)"
+  parent="$(remote_head)" || return 1
   export GIT_DIR="$(git rev-parse --absolute-git-dir)"
   export GIT_INDEX_FILE="$(mktemp -u)"
   export GIT_AUTHOR_NAME="trader-bot" GIT_AUTHOR_EMAIL="trader-bot@users.noreply.github.com"
