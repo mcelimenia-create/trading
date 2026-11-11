@@ -197,13 +197,17 @@ def telegram_job(notify, token, chat_id):
     replies = []
     messages = telegram_io.text_messages(updates, chat_id)
     print(f"telegram: updates={len(updates)} mensajes_del_chat={len(messages)} offset={offset}")
+    market = market_context() if messages else None
     for update_id, text in messages:
-        state, reply = real_positions.handle_command(state, text, real_fetch)
+        state, reply = real_positions.handle_command(state, text, real_fetch, market=market)
         replies.append(reply)
         OFFSET_FILE.write_text(json.dumps({"offset": update_id + 1}), encoding="utf-8")
     if messages:
         replies += portfolio_warnings(state)
     state, alerts = real_positions.monitor(state, real_fetch)
+    state, review = real_positions.weekly_review(state, datetime.now(NEW_YORK).strftime("%Y-%m-%d"))
+    if review:
+        replies.append(review)
     REAL_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
     for reply in replies:
         notify(reply)
@@ -219,6 +223,19 @@ def real_fetch(symbol):
 
 def load_portfolio():
     return json.loads(PORTFOLIO_FILE.read_text(encoding="utf-8"))
+
+
+def load_candidates():
+    if not CANDIDATES_PUBLIC_FILE.exists():
+        return []
+    return json.loads(CANDIDATES_PUBLIC_FILE.read_text(encoding="utf-8"))["candidates"]
+
+
+def market_context():
+    cfg = load_portfolio()
+    state, fx = regime.fetch_context(cfg)
+    return {"cfg": cfg, "fx": fx, "state": state["state"], "exposure_factor": state["exposure_factor"],
+            "candidates": load_candidates()}
 
 
 def portfolio_warnings(state):
