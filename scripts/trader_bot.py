@@ -90,6 +90,8 @@ def send_telegram(token, chat_id, text):
 def news_job(notify):
     tickers = load_config()["tickers"]
     result = run_skill("trader-news/news.py", ["--tickers", *tickers, "--hours", "24", "--json"], NEWS_OK_CODES)
+    if not result.stdout.strip():
+        raise RuntimeError(f"news.py no devolvio datos: {result.stderr.strip()[-800:]}")
     fresh = [item for item in json.loads(result.stdout)["items"] if item.get("new")]
     if not fresh:
         print("Sin noticias nuevas")
