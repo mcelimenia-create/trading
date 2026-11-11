@@ -19,8 +19,12 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import candidates
+import catalysts
+import fundamentals
 import paper_trader
 import real_positions
+import regime
+import scanner
 import telegram_io
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -32,6 +36,8 @@ PAPER_FILE = TRADER_DIR / "paper.json"
 REAL_FILE = TRADER_DIR / "real.json"
 OFFSET_FILE = TRADER_DIR / "telegram_offset.json"
 CANDIDATE_CONFIG = ROOT / "config" / "candidates.json"
+PORTFOLIO_FILE = ROOT / "config" / "portfolio.json"
+SEC_EXCHANGES_URL = "https://www.sec.gov/files/company_tickers_exchange.json"
 DOCS_DATA_DIR = ROOT / "docs" / "data"
 CANDIDATES_PUBLIC_FILE = DOCS_DATA_DIR / "candidates.json"
 DASHBOARD_JOBS = {"news", "paper", "candidates"}
@@ -195,6 +201,8 @@ def telegram_job(notify, token, chat_id):
         state, reply = real_positions.handle_command(state, text, real_fetch)
         replies.append(reply)
         OFFSET_FILE.write_text(json.dumps({"offset": update_id + 1}), encoding="utf-8")
+    if messages:
+        replies += portfolio_warnings(state)
     state, alerts = real_positions.monitor(state, real_fetch)
     REAL_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
     for reply in replies:
@@ -209,9 +217,33 @@ def real_fetch(symbol):
     return paper_trader.fetch_bars(symbol)
 
 
+def load_portfolio():
+    return json.loads(PORTFOLIO_FILE.read_text(encoding="utf-8"))
+
+
+def portfolio_warnings(state):
+    cfg = load_portfolio()
+    today = datetime.now(NEW_YORK).strftime("%Y-%m-%d")
+    found = real_positions.limit_warnings(state, cfg, today, regime.fx_usd_per_eur(cfg))
+    symbols = [p["symbol"] for p in state["open"]]
+    soon = catalysts.earnings_soon(symbols, today, cfg["earnings_window_days"], os.environ.get("FINNHUB_API_KEY", ""))
+    found += [f"resultados de {symbol} el {day}: revisa la tesis antes" for symbol, day in soon or []]
+    return [f"AVISO DE CARTERA: {w}" for w in found]
+
+
+def scan_job(notify):
+    if not fundamentals.sec_user_agent():
+        raise RuntimeError("falta SEC_USER_AGENT para leer la lista de la SEC")
+    known = set(load_config()["tickers"]) | set(load_json(CANDIDATE_CONFIG, {"tickers": []})["tickers"])
+    universe = [s for s in scanner.universe_from_sec(fundamentals.fetch_sec_json(SEC_EXCHANGES_URL))
+                if s not in known]
+    proposals, checked = scanner.scan_universe(universe, paper_trader.fetch_bars, pause_s=scanner.REQUEST_PAUSE_S)
+    notify(scanner.format_message(proposals, checked, len(universe)))
+
+
 def candidates_job(notify):
     tickers = load_json(CANDIDATE_CONFIG, {"tickers": []})["tickers"]
-    candidates.candidates_job(notify, tickers, CANDIDATES_PUBLIC_FILE)
+    candidates.candidates_job(notify, tickers, CANDIDATES_PUBLIC_FILE, load_portfolio())
 
 
 def report_failure(job, error, notify):
@@ -237,10 +269,10 @@ def publish_dashboard(job, ok=True):
 def main(argv):
     jobs = {
         "news": news_job, "session": session_job, "paper": paper_job,
-        "candidates": candidates_job, "telegram": None,
+        "candidates": candidates_job, "scan": scan_job, "telegram": None,
     }
     if len(argv) != 2 or argv[1] not in jobs:
-        print("Uso: trader_bot.py news|session|paper|candidates|telegram", file=sys.stderr)
+        print("Uso: trader_bot.py news|session|paper|candidates|scan|telegram", file=sys.stderr)
         return 2
     env = {**load_env(ENV_FILE), **os.environ}
     token = env.get("TELEGRAM_BOT_TOKEN")

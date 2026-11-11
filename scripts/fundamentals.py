@@ -1,5 +1,6 @@
 """Crecimiento anual de ingresos desde la SEC, con la fecha en que se publico (sin mirar al futuro)."""
 import bisect
+import functools
 import json
 import os
 import urllib.request
@@ -27,11 +28,17 @@ def fetch_sec_json(url):
         return json.loads(response.read())
 
 
+def ticker_map(payload):
+    return {entry["ticker"].upper(): entry["cik_str"] for entry in payload.values()}
+
+
+@functools.lru_cache(maxsize=1)
+def company_tickers():
+    return ticker_map(fetch_sec_json(TICKERS_URL))
+
+
 def cik_for(ticker):
-    for entry in fetch_sec_json(TICKERS_URL).values():
-        if entry["ticker"].upper() == ticker.upper():
-            return entry["cik_str"]
-    return None
+    return company_tickers().get(ticker.upper())
 
 
 def annual_growth(facts):

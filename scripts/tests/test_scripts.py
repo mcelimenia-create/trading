@@ -90,6 +90,32 @@ class RealPositionsCommandTest(unittest.TestCase):
         self.assertIn("ayuda", reply)
 
 
+class LimitWarningsTest(unittest.TestCase):
+    CFG = {"capital_eur": 700, "max_weight": 0.20, "max_monthly_loss_pct": 0.05}
+
+    def test_warns_when_one_position_exceeds_twenty_percent(self):
+        state = {"open": [{"symbol": "TSLA", "entry": 100.0, "shares": 2.0}], "closed": []}
+        warnings = real_positions.limit_warnings(state, self.CFG, "2026-11-11", fx=1.1)
+        self.assertTrue(any("TSLA" in w and "20%" in w for w in warnings))
+
+    def test_warns_when_monthly_net_loss_reaches_five_percent(self):
+        state = {"open": [], "closed": [{"symbol": "TSLA", "entry": 100.0, "exit": 60.0, "shares": 2.0,
+                                         "exit_date": "2026-11-05"}]}
+        warnings = real_positions.limit_warnings(state, self.CFG, "2026-11-11", fx=1.1)
+        self.assertTrue(any("mensual" in w for w in warnings))
+
+    def test_no_warning_for_losses_in_previous_month(self):
+        state = {"open": [], "closed": [{"symbol": "TSLA", "entry": 100.0, "exit": 60.0, "shares": 2.0,
+                                         "exit_date": "2026-10-28"}]}
+        self.assertEqual(real_positions.limit_warnings(state, self.CFG, "2026-11-11", fx=1.1), [])
+
+    def test_exit_records_its_date(self):
+        opened, _ = real_positions.handle_command(
+            real_positions.empty_real_state(), "entre TSLA 100", lambda s: [], today="2026-11-01")
+        state, _ = real_positions.handle_command(opened, "sali TSLA 110", lambda s: [], today="2026-11-11")
+        self.assertEqual(state["closed"][0]["exit_date"], "2026-11-11")
+
+
 class MonitorTest(unittest.TestCase):
     def test_stop_alert_is_sent_once_per_day(self):
         bars = make_bars([100] * 20)
@@ -116,6 +142,12 @@ class FailureReportTest(unittest.TestCase):
         def broken_notify(text):
             raise OSError("Telegram caido")
         trader_bot.report_failure("paper", RuntimeError("sin red"), broken_notify)
+
+
+class TickerMapTest(unittest.TestCase):
+    def test_maps_upper_ticker_to_cik(self):
+        payload = {"0": {"cik_str": 320193, "ticker": "aapl"}, "1": {"cik_str": 789019, "ticker": "MSFT"}}
+        self.assertEqual(fundamentals.ticker_map(payload)["AAPL"], 320193)
 
 
 class LatestGrowthTest(unittest.TestCase):

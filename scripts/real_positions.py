@@ -52,13 +52,13 @@ def register_entry(state, symbol, entry, shares, today, fetch):
     return new_state, f"Registrada entrada en {symbol} a {entry:.2f}. {stop_text}."
 
 
-def register_exit(state, symbol, price):
+def register_exit(state, symbol, price, today):
     matches = [p for p in state["open"] if p["symbol"] == symbol]
     if not matches:
         return state, f"No tengo ninguna posicion abierta en {symbol}."
     position = matches[0]
     ret = (price - position["entry"]) / position["entry"]
-    closed = {**position, "exit": price, "ret": ret}
+    closed = {**position, "exit": price, "ret": ret, "exit_date": today}
     new_state = {"open": [p for p in state["open"] if p is not position],
                  "closed": state["closed"] + [closed]}
     return new_state, f"Registrada salida de {symbol} a {price:.2f}: resultado {100 * ret:+.2f}% (antes de impuestos y comisiones)."
@@ -87,8 +87,33 @@ def handle_command(state, text, fetch, today=None):
         return register_entry(state, symbol, parse_number(entry_match.group(2)), shares, today, fetch)
     exit_match = EXIT_RE.match(text)
     if exit_match:
-        return register_exit(state, exit_match.group(1).upper(), parse_number(exit_match.group(2)))
+        return register_exit(state, exit_match.group(1).upper(), parse_number(exit_match.group(2)), today)
     return state, "No entendi. Escribe 'ayuda'."
+
+
+def monthly_net_eur(state, today, fx):
+    month = today[:7]
+    return sum((c["exit"] - c["entry"]) * c["shares"] / fx
+               for c in state["closed"]
+               if c.get("exit_date", "")[:7] == month and c.get("shares"))
+
+
+def limit_warnings(state, cfg, today, fx):
+    """Avisos de limites de cartera: peso maximo por accion y perdida neta del mes (en EUR)."""
+    if not fx:
+        return []
+    capital = cfg["capital_eur"]
+    warnings = []
+    for p in state["open"]:
+        if not p.get("shares"):
+            continue
+        weight = p["shares"] * p["entry"] / fx / capital
+        if weight > cfg["max_weight"]:
+            warnings.append(f"{p['symbol']} pesa {100 * weight:.0f}% del capital, por encima del {100 * cfg['max_weight']:.0f}%.")
+    net = monthly_net_eur(state, today, fx)
+    if net <= -cfg["max_monthly_loss_pct"] * capital:
+        warnings.append(f"Perdida neta del mes {net:.0f} EUR: alcanza el limite mensual del {100 * cfg['max_monthly_loss_pct']:.0f}%.")
+    return warnings
 
 
 def exit_alerts(position, bars):

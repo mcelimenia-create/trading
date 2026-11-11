@@ -6,6 +6,7 @@ on:
     - cron: "*/15 13-21 * * 1-5"   # sesion de mercado, dias laborables (UTC)
     - cron: "30 21 * * 1-5"        # cartera de papel, tras el cierre (UTC)
     - cron: "45 21 * * 1-5"        # candidatos de medio plazo, tras el cierre (UTC)
+    - cron: "0 22 * * 5"           # escaner de EEUU, cada viernes (UTC)
     - cron: "*/15 * * * *"         # Telegram: tus mensajes y seguimiento de posiciones reales
   workflow_dispatch:
     inputs:
@@ -13,7 +14,7 @@ on:
         description: "Tarea a ejecutar"
         type: choice
         default: telegram
-        options: [telegram, news, session, paper, candidates]
+        options: [telegram, news, session, paper, candidates, scan]
 
 permissions:
   contents: write
@@ -27,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      JOB: ${{ github.event_name == 'workflow_dispatch' && inputs.job || github.event.schedule == '*/15 13-21 * * 1-5' && 'session' || github.event.schedule == '30 21 * * 1-5' && 'paper' || github.event.schedule == '45 21 * * 1-5' && 'candidates' || github.event.schedule == '*/15 * * * *' && 'telegram' || 'news' }}
+      JOB: ${{ github.event_name == 'workflow_dispatch' && inputs.job || github.event.schedule == '*/15 13-21 * * 1-5' && 'session' || github.event.schedule == '30 21 * * 1-5' && 'paper' || github.event.schedule == '45 21 * * 1-5' && 'candidates' || github.event.schedule == '0 22 * * 5' && 'scan' || github.event.schedule == '*/15 * * * *' && 'telegram' || 'news' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -45,6 +46,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
           TRADER_DIR: ${{ runner.temp }}/bot-state/trader
         run: python3 scripts/trader_bot.py "$JOB"
 

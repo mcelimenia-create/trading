@@ -40,13 +40,14 @@ def fetch_bars(symbol, span="5y"):
     with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_S) as response:
         result = json.loads(response.read())["chart"]["result"][0]
     quote = result["indicators"]["quote"][0]
+    volumes = quote.get("volume") or [0] * len(result["timestamp"])
     bars = []
-    for ts, o, h, l, c in zip(result["timestamp"], quote["open"], quote["high"], quote["low"], quote["close"]):
+    for ts, o, h, l, c, v in zip(result["timestamp"], quote["open"], quote["high"], quote["low"], quote["close"], volumes):
         if None in (o, h, l, c):
             continue
         bars.append({
             "date": datetime.fromtimestamp(ts, timezone.utc).date().isoformat(),
-            "open": o, "high": h, "low": l, "close": c,
+            "open": o, "high": h, "low": l, "close": c, "volume": v or 0,
         })
     return bars
 
