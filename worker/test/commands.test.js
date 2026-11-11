@@ -118,3 +118,14 @@ test("numbers with several separators are rejected, not saved as NaN", async () 
   assert.equal(r.state.open.length, 0);
   assert.match(r.reply, /No entendi/);
 });
+
+test("zero prices are rejected for entries, exits and stops", async () => {
+  const zeroEntry = await handleCommand(emptyState(), "entre TSLA 0 10", deps());
+  assert.equal(zeroEntry.state.open.length, 0);
+  assert.match(zeroEntry.reply, /mayor que cero/);
+  const opened = await handleCommand(emptyState(), "entre TSLA 100 10", deps());
+  const zeroExit = await handleCommand(opened.state, "sali TSLA 0", deps());
+  assert.equal(zeroExit.state.closed.length, 0);
+  const zeroStop = await handleCommand(opened.state, "stop TSLA 0", deps());
+  assert.equal(zeroStop.state.open[0].stop, opened.state.open[0].stop);
+});

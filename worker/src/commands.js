@@ -34,6 +34,14 @@ function num(text) {
   return Number(text.replace(",", "."));
 }
 
+const PRICE_ERROR = "El precio tiene que ser mayor que cero.";
+
+// Devuelve el numero si es un precio valido (> 0), o null.
+function priceOf(text) {
+  const value = num(text);
+  return value > 0 ? value : null;
+}
+
 function listOpen(state) {
   if (!state.open.length) return "No hay posiciones abiertas.";
   return state.open
@@ -135,19 +143,30 @@ export async function handleCommand(state, rawText, d) {
   const entry = text.match(ENTRY_RE);
   if (entry) {
     const symbol = entry[1].toUpperCase();
+    const price = priceOf(entry[2]);
     const shares = entry[3] ? num(entry[3]) : null;
-    return registerEntry(state, symbol, num(entry[2]), shares, d.today, d);
+    if (price === null || (shares !== null && shares <= 0)) return { state, reply: PRICE_ERROR };
+    return registerEntry(state, symbol, price, shares, d.today, d);
   }
   const exit = text.match(EXIT_RE);
   if (exit) {
+    const price = priceOf(exit[2]);
+    if (price === null) return { state, reply: PRICE_ERROR };
     const shares = exit[3] ? num(exit[3]) : null;
-    return registerExit(state, exit[1].toUpperCase(), num(exit[2]), d.today, shares);
+    return registerExit(state, exit[1].toUpperCase(), price, d.today, shares);
   }
   const stop = text.match(STOP_RE);
-  if (stop) return updateStop(state, stop[1].toUpperCase(), num(stop[2]));
+  if (stop) {
+    const price = priceOf(stop[2]);
+    if (price === null) return { state, reply: PRICE_ERROR };
+    return updateStop(state, stop[1].toUpperCase(), price);
+  }
   const risk = text.match(RISK_RE);
   if (risk) {
-    return { state, reply: riskText(risk[1].toUpperCase(), num(risk[2]), num(risk[3]), d) };
+    const entryPrice = priceOf(risk[2]);
+    const stopPrice = priceOf(risk[3]);
+    if (entryPrice === null || stopPrice === null) return { state, reply: PRICE_ERROR };
+    return { state, reply: riskText(risk[1].toUpperCase(), entryPrice, stopPrice, d) };
   }
   return { state, reply: "No entendi. Escribe 'ayuda'." };
 }
