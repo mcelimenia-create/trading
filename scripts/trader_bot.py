@@ -52,10 +52,17 @@ def load_config():
     return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
 
 
+def skill_env():
+    env = dict(os.environ)
+    if "SEC_USER_AGENT" in env:
+        env["SEC_USER_AGENT"] = " ".join(env["SEC_USER_AGENT"].split())
+    return env
+
+
 def run_skill(script, args, ok_codes):
     result = subprocess.run(
         [sys.executable, str(SKILLS_DIR / script), *args],
-        cwd=ROOT, capture_output=True, text=True, timeout=SKILL_TIMEOUT_S,
+        cwd=ROOT, capture_output=True, text=True, timeout=SKILL_TIMEOUT_S, env=skill_env(),
     )
     if result.returncode not in ok_codes:
         raise RuntimeError(f"{script} {' '.join(args)} -> {result.returncode}: {result.stderr.strip()}")
