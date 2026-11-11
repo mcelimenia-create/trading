@@ -59,7 +59,8 @@ ATR_BARS = 14
 MIN_RISK_PCT = Decimal("0.05")     # risk under 0.05% of the price is inside the spread's noise
 CENT = Decimal("0.01")
 EPOCH = datetime.datetime(1970, 1, 1)
-NOTE = "A stop is a plan, not a guarantee: a gap or a fast market can fill past it."
+NOTE = "Un stop es un plan, no una garantia: un salto de precio o un mercado rapido pueden ejecutarlo mas abajo."
+STATUS_ES = {"waiting": "en espera", "triggered": "activada", "expired": "caducada", "no-data": "sin datos"}
 
 NYSE_HOLIDAYS = {
     "2026-01-01": "New Year's Day",
@@ -84,9 +85,9 @@ NYSE_HOLIDAYS = {
     "2027-12-24": "Christmas Day (observed)",
 }
 NYSE_EARLY_CLOSE = {  # 1:00 p.m. ET
-    "2026-11-27": "day after Thanksgiving",
+    "2026-11-27": "dia despues de Accion de Gracias",
     "2026-12-24": "Christmas Eve",
-    "2027-11-26": "day after Thanksgiving",
+    "2027-11-26": "dia despues de Accion de Gracias",
 }
 OPEN = datetime.time(9, 30)
 CLOSE = datetime.time(16, 0)
@@ -156,7 +157,7 @@ def parse_now(text):
 def parse_hhmm(text, what):
     m = re.match(r"^\s*(\d{1,2}):(\d{2})\s*$", str(text))
     if not m or int(m.group(1)) > 23 or int(m.group(2)) > 59:
-        raise PlanError("%s wants a New York time like 15:55, not %r" % (what, text))
+        raise PlanError("%s quiere una hora de Nueva York como 15:55, no %r" % (what, text))
     return datetime.time(int(m.group(1)), int(m.group(2)))
 
 
@@ -164,14 +165,14 @@ def parse_clock(text, what):
     """10:15 AM, 10:15, 3:05 PM -> time."""
     m = re.match(r"^\s*(\d{1,2}):(\d{2})\s*([AaPp][Mm])?\s*$", str(text))
     if not m:
-        raise PlanError("%s wants a time like 10:15 AM, not %r" % (what, text))
+        raise PlanError("%s quiere una hora como 10:15 AM, no %r" % (what, text))
     h, mi = int(m.group(1)), int(m.group(2))
     if m.group(3):
         if not 1 <= h <= 12:
-            raise PlanError("%s wants a time like 10:15 AM, not %r" % (what, text))
+            raise PlanError("%s quiere una hora como 10:15 AM, no %r" % (what, text))
         h = h % 12 + (12 if m.group(3).upper() == "PM" else 0)
     if h > 23 or mi > 59:
-        raise PlanError("%s wants a time like 10:15 AM, not %r" % (what, text))
+        raise PlanError("%s quiere una hora como 10:15 AM, no %r" % (what, text))
     return datetime.time(h, mi)
 
 
@@ -199,7 +200,7 @@ def D(x, what="a number"):
             return Decimal(repr(x))
         return Decimal(str(x).strip().lstrip("$").replace(",", ""))
     except (InvalidOperation, ValueError):
-        raise PlanError("%s is not a number: %r" % (what, x))
+        raise PlanError("%s no es un numero: %r" % (what, x))
 
 
 def cents(x):
@@ -228,7 +229,6 @@ def ratio(x):
     return s[:-1] if s.endswith("0") else s
 
 
-WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five"}
 
 
 def parse_stop(text):
@@ -239,12 +239,12 @@ def parse_stop(text):
         return "or_low", None
     m = re.match(r"^(price|pct|atr):\s*\$?([0-9][0-9,]*\.?[0-9]*)$", t)
     if not m:
-        raise PlanError("--stop is or-mid, or-low, price:X, pct:X or atr:K (got %r)" % text)
+        raise PlanError("--stop es or-mid, or-low, price:X, pct:X o atr:K (recibido %r)" % text)
     kind, val = m.group(1), D(m.group(2), "--stop")
     if val <= 0:
-        raise PlanError("--stop %s needs a number above 0" % kind)
+        raise PlanError("--stop %s necesita un numero mayor que 0" % kind)
     if kind == "pct" and val >= 100:
-        raise PlanError("--stop pct:X needs X under 100")
+        raise PlanError("--stop pct:X necesita una X menor que 100")
     return kind, val
 
 
@@ -254,17 +254,17 @@ def parse_target(text):
     if m:
         r = D(m.group(1), "--target")
         if r <= 0:
-            raise PlanError("--target needs an R multiple above 0, like 1R or 2R")
+            raise PlanError("--target necesita un multiplo de R mayor que 0, como 1R o 2R")
         return "r", r
     m = re.match(r"^price:\s*\$?([0-9][0-9,]*\.?[0-9]*)$", t.lower())
     if m:
         return "price", D(m.group(1), "--target")
-    raise PlanError("--target is 2R, 1R, 1.5R ... or price:X (got %r)" % text)
+    raise PlanError("--target es 2R, 1R, 1.5R ... o price:X (recibido %r)" % text)
 
 
 def r_label(r):
     n = int(r) if r == r.to_integral_value() else None
-    return "%sR (%s times the risk)" % (num(r), WORDS.get(n, num(r)))
+    return "%sR (%s veces el riesgo)" % (num(r), num(r))
 
 
 def compute(entry, stop_rule, stop_param, target_rule, target_param, or_high=None, or_low=None,
@@ -272,49 +272,49 @@ def compute(entry, stop_rule, stop_param, target_rule, target_param, or_high=Non
     """The stop, the target and the risk, in exact cents. Raises PlanError with the reason."""
     e = cents(entry)
     if e <= 0:
-        raise PlanError("the entry price must be above $0")
+        raise PlanError("el precio de entrada debe ser mayor que $0")
     detail = ""
     if stop_rule in ("or_mid", "or_low"):
         if or_high is None or or_low is None:
-            raise PlanError("an %s stop needs the opening range (--or-high and --or-low)" % stop_rule.replace("_", "-"))
+            raise PlanError("un stop %s necesita el rango de apertura (--or-high y --or-low)" % stop_rule.replace("_", "-"))
         oh, ol = cents(or_high), cents(or_low)
         if oh <= ol:
-            raise PlanError("the opening-range high %s must be above its low %s" % (money(oh), money(ol)))
+            raise PlanError("el maximo del rango de apertura %s debe estar por encima de su minimo %s" % (money(oh), money(ol)))
         if stop_rule == "or_mid":
             raw = (oh + ol) / 2
-            label = "opening-range midpoint"
+            label = "punto medio del rango de apertura"
             detail = "(%s + %s) / 2 = $%s" % (money(oh), money(ol), num(raw))
         else:
-            raw, label = ol, "opening-range low"
+            raw, label = ol, "minimo del rango de apertura"
     elif stop_rule == "price":
-        raw, label = stop_param, "your price"
+        raw, label = stop_param, "tu precio"
     elif stop_rule == "pct":
         raw = e * (1 - stop_param / 100)
-        label = "%s%% under the entry" % num(stop_param)
+        label = "%s%% por debajo de la entrada" % num(stop_param)
         detail = "%s x (1 - %s%%) = $%s" % (money(e), num(stop_param), num(raw))
     elif stop_rule == "atr":
         if atr is None:
             raise PlanError("an atr stop needs the session's bars")
         a = D(round(atr, 6))
         raw = e - stop_param * a
-        label = "%s x ATR(%d) under the entry" % (num(stop_param), atr_bars)
-        detail = "ATR $%s over the %d bars to the entry%s" % (
-            num(a.quantize(Decimal("0.0001"))), atr_bars, " (fewer than 14 so far)" if atr_bars < ATR_BARS else "")
+        label = "%s x ATR(%d) por debajo de la entrada" % (num(stop_param), atr_bars)
+        detail = "ATR $%s sobre las %d velas hasta la entrada%s" % (
+            num(a.quantize(Decimal("0.0001"))), atr_bars, " (menos de 14 hasta ahora)" if atr_bars < ATR_BARS else "")
     else:
-        raise PlanError("unknown stop rule %r" % stop_rule)
+        raise PlanError("regla de stop desconocida %r" % stop_rule)
     stop = floor_cents(raw)
     if stop != D(raw):
-        detail = (detail + ", rounded down" if detail else "$%s rounded down" % num(raw))
+        detail = (detail + ", redondeado a la baja" if detail else "$%s redondeado a la baja" % num(raw))
     if stop >= e:
-        raise PlanError("the stop %s (%s) is at or above the entry %s: a long's stop goes under the entry"
+        raise PlanError("el stop %s (%s) esta en la entrada %s o por encima: el stop de una compra va por debajo de la entrada"
                         % (money(stop), label, money(e)))
     if stop <= 0:
-        raise PlanError("the stop works out to %s: pick a stop above $0" % money(stop))
+        raise PlanError("el stop sale en %s: elige un stop por encima de $0" % money(stop))
     risk = e - stop
     floor_risk = e * MIN_RISK_PCT / 100
     if risk < floor_risk:
-        raise PlanError("the stop is %s under the entry, less than 0.05%% of the price (%s on %s): too tight to "
-                        "survive the spread, normal wiggle would stop you out. Widen it."
+        raise PlanError("el stop esta a %s por debajo de la entrada, menos del 0,05%% del precio (%s en %s): demasiado cerca para "
+                        "aguantar el diferencial; un movimiento normal te sacaria. Amplialo."
                         % (money(risk), money(floor_risk.quantize(CENT, rounding=ROUND_HALF_UP)), money(e)))
     if target_rule == "r":
         target = cents(e + target_param * risk)
@@ -323,11 +323,11 @@ def compute(entry, stop_rule, stop_param, target_rule, target_param, or_high=Non
         target = cents(target_param)
         t_label = None
     if target <= e:
-        raise PlanError("the target %s is at or below the entry %s: a long's target goes above it"
+        raise PlanError("el objetivo %s esta en la entrada %s o por debajo: el objetivo de una compra va por encima"
                         % (money(target), money(e)))
     rr = ((target - e) / risk).quantize(CENT, rounding=ROUND_HALF_UP)
     if t_label is None:
-        t_label = "your price (%sR)" % ratio(rr)
+        t_label = "tu precio (%sR)" % ratio(rr)
     return {"entry": e, "stop": stop, "stop_label": label, "stop_detail": detail, "target": target,
             "target_r": target_param if target_rule == "r" else rr, "target_label": t_label,
             "risk": risk, "reward_risk": rr}
@@ -347,7 +347,7 @@ def _sleep(seconds):
 
 def yahoo_get(path):
     """query2 first, query1 on 429 or 5xx; one retry after a pause on 429."""
-    last = "no answer"
+    last = "sin respuesta"
     for host in HOSTS:
         url = "https://%s.finance.yahoo.com%s" % (host, path)
         for attempt in (0, 1):
@@ -365,21 +365,21 @@ def yahoo_get(path):
                 if code == 404:
                     if body:
                         return body
-                    raise PlanError("Yahoo has no chart at %s (HTTP 404)" % url.split("?")[0])
+                    raise PlanError("Yahoo no tiene grafico para %s (HTTP 404)" % url.split("?")[0])
                 last = "HTTP %d" % code
                 if code == 429 and attempt == 0:
                     _sleep(BACKOFF)
                     continue
                 if code == 429 or code >= 500:
                     break
-                raise PlanError("Yahoo answered HTTP %d for %s" % (code, url.split("?")[0]))
+                raise PlanError("Yahoo respondio HTTP %d para %s" % (code, url.split("?")[0]))
             except urllib.error.URLError as e:
-                last = "could not connect: %s" % (e.reason,)
+                last = "no pude conectar: %s" % (e.reason,)
                 break
             except OSError as e:
-                last = "network error: %s" % (e,)
+                last = "error de red: %s" % (e,)
                 break
-    raise PlanError("Yahoo did not answer (%s on query2 and query1): wait a minute and try again" % last)
+    raise PlanError("Yahoo no respondio (%s en query2 y query1): espera un minuto y vuelve a intentarlo" % last)
 
 
 def read_text(path):
@@ -399,29 +399,29 @@ def load_chart(sym, interval, day, offline=None):
             if not os.path.exists(path):
                 path += ".gz"
         if not os.path.exists(path):
-            raise PlanError("no offline file %s" % path)
+            raise PlanError("no hay archivo sin conexion %s" % path)
         try:
             text = read_text(path)
         except (OSError, ValueError) as e:
-            raise PlanError("could not read %s: %s" % (path, e))
+            raise PlanError("no pude leer %s: %s" % (path, e))
     else:
         back = (to_eastern(utc_now()).date() - day).days
         rng = "1d" if back <= 0 else "5d" if back <= 6 else "1mo" if back <= 28 else "60d"
         if interval == "1m" and back > 6:
-            raise PlanError("Yahoo keeps 1-minute bars for about a week")
+            raise PlanError("Yahoo guarda las velas de 1 minuto unos siete dias")
         text = yahoo_get("/v8/finance/chart/%s?range=%s&interval=%s" % (ysym, rng, interval))
     try:
         data = json.loads(text)
         res = data["chart"]["result"]
     except (ValueError, KeyError, TypeError):
-        raise PlanError("Yahoo returned something unexpected for %s" % sym)
+        raise PlanError("Yahoo devolvio una respuesta inesperada para %s" % sym)
     if not res:
         err = (data.get("chart") or {}).get("error") or {}
-        raise PlanError("Yahoo has no data for %s: %s" % (sym, err.get("description") or "unknown ticker"))
+        raise PlanError("Yahoo no tiene datos para %s: %s" % (sym, err.get("description") or "ticker desconocido"))
     r = res[0] or {}
     meta = r.get("meta") or {}
     if str(meta.get("symbol") or ysym).upper() != ysym:
-        raise PlanError("the chart file holds %s, not %s" % (meta.get("symbol"), sym))
+        raise PlanError("el archivo del grafico contiene %s, no %s" % (meta.get("symbol"), sym))
     q = ((r.get("indicators") or {}).get("quote") or [{}])[0] or {}
 
     def at(key, i):
@@ -484,12 +484,12 @@ def atr_of(bars, n=ATR_BARS):
 
 def read_json(path, what):
     if not path or not os.path.exists(path):
-        raise PlanError("no %s at %s" % (what, path))
+        raise PlanError("no hay %s en %s" % (what, path))
     try:
         with open(path, encoding="utf-8") as fh:
             return json.load(fh)
     except ValueError as e:
-        raise PlanError("%s is not valid JSON: %s" % (path, e))
+        raise PlanError("%s no es JSON valido: %s" % (path, e))
 
 
 def read_config(path):
@@ -512,14 +512,14 @@ def resolve_flat_by(day, explicit, cfg, entry_time):
         at = datetime.datetime.combine(day, t)
         if at >= close_dt:
             if explicit:
-                raise PlanError("--flat-by %s is at or after the %s close on %s" % (hm(t), ampm(s[1]), day))
+                raise PlanError("--flat-by %s es igual o posterior al cierre de las %s el %s" % (hm(t), ampm(s[1]), day))
             moved = at - (datetime.datetime.combine(day, CLOSE) - close_dt)
             if moved.time() <= OPEN:
-                raise PlanError("flat_by %s in the config is at or after the close" % hm(t))
+                raise PlanError("flat_by %s de la configuracion es igual o posterior al cierre" % hm(t))
             t = moved.time()
-            note = "moved up for the 1:00 p.m. early close (%s)" % NYSE_EARLY_CLOSE.get(day.isoformat(), "")
+            note = "adelantada por el cierre anticipado a las 13:00 (%s)" % NYSE_EARLY_CLOSE.get(day.isoformat(), "")
     if entry_time and entry_time >= t:
-        raise PlanError("the entry at %s is at or after your flat-by %s: there is no time left to hold it"
+        raise PlanError("la entrada a las %s es igual o posterior a tu hora de salida %s: no queda tiempo para mantenerla"
                         % (ampm(entry_time), hm(t)))
     return hm(t), note
 
@@ -527,25 +527,25 @@ def resolve_flat_by(day, explicit, cfg, entry_time):
 def gather(a):
     """The entry facts, from trader/entry.json or the flags."""
     if a.symbol and a.from_path:
-        raise PlanError("use --from or --symbol, not both")
+        raise PlanError("usa --from o --symbol, no ambos")
     if a.side in ("sell", "short"):
-        raise PlanError("v2 plans longs only: no stops above a short entry. Plan a buy instead.")
+        raise PlanError("los planes v2 son solo largos: sin stops por encima de una entrada corta. Planifica una compra.")
     if a.symbol:
         if a.entry is None:
-            raise PlanError("--symbol needs --entry PRICE")
+            raise PlanError("--symbol necesita --entry PRECIO")
         if (a.or_high is None) != (a.or_low is None):
-            raise PlanError("give both --or-high and --or-low, or neither")
+            raise PlanError("indica --or-high y --or-low juntos, o ninguno")
         info = {"symbol": a.symbol.upper(), "entry": a.entry, "setup": a.setup or ("orb" if a.or_high is not None else "level"),
                 "date": a.date, "entry_time": a.time, "entry_bar": a.entry_bar, "interval": a.interval or "5m",
                 "or_high": a.or_high, "or_low": a.or_low, "or_minutes": a.or_minutes, "source": "flags"}
     else:
         path = a.from_path or "trader/entry.json"
-        doc = read_json(path, "entry (run /trader-entry first, or give --symbol and --entry)")
+        doc = read_json(path, "entrada (ejecuta antes /trader-entry, o indica --symbol y --entry)")
         if str(doc.get("side") or "buy").lower() not in ("buy", "long"):
-            raise PlanError("%s is a %s: v2 plans longs only" % (path, doc.get("side")))
+            raise PlanError("%s es un %s: los planes v2 son solo largos" % (path, doc.get("side")))
         if doc.get("status") != "triggered" and a.entry is None:
-            raise PlanError("%s says %s is %s, not triggered: plan once it triggers, or give --entry PRICE to plan ahead"
-                            % (path, doc.get("symbol"), doc.get("status") or "unknown"))
+            raise PlanError("%s indica que %s esta %s, sin activar: planifica cuando se active, o indica --entry PRECIO para planificar antes"
+                            % (path, doc.get("symbol"), STATUS_ES.get(doc.get("status"), "desconocido")))
         orr = doc.get("opening_range") or {}
         info = {"symbol": str(doc.get("symbol") or "").upper(), "entry": a.entry if a.entry is not None else doc.get("price"),
                 "setup": a.setup or doc.get("setup") or "orb", "date": a.date or doc.get("date"),
@@ -556,9 +556,9 @@ def gather(a):
                 "or_low": a.or_low if a.or_low is not None else orr.get("low"),
                 "or_minutes": orr.get("minutes") or a.or_minutes, "source": path}
         if not info["symbol"] or info["entry"] is None:
-            raise PlanError("%s has no symbol or price" % path)
+            raise PlanError("%s no tiene simbolo ni precio" % path)
     if info["interval"] not in INTERVALS:
-        raise PlanError("interval is 5m or 1m")
+        raise PlanError("el intervalo debe ser 5m o 1m")
     return info
 
 
@@ -568,7 +568,7 @@ def build_plan(a, now_utc):
     stop_text = a.stop
     if not stop_text:
         if info["setup"] != "orb":
-            raise PlanError("a %s setup has no opening-range stop to default to: give --stop price:X, pct:X or atr:K"
+            raise PlanError("una configuracion %s no tiene stop de rango de apertura por defecto: indica --stop price:X, pct:X o atr:K"
                             % info["setup"])
         stop_text = "or-mid"
     stop_rule, stop_param = parse_stop(stop_text)
@@ -578,7 +578,7 @@ def build_plan(a, now_utc):
         try:
             day = datetime.date.fromisoformat(str(info["date"]))
         except ValueError:
-            raise PlanError("date wants YYYY-MM-DD, not %r" % info["date"])
+            raise PlanError("la fecha debe ser AAAA-MM-DD, no %r" % info["date"])
     else:
         day = to_eastern(now_utc).date()
     entry_time = parse_clock(info["entry_time"], "the entry time") if info["entry_time"] else None
@@ -587,7 +587,7 @@ def build_plan(a, now_utc):
         chart = load_chart(info["symbol"], info["interval"], day, a.offline)
         bars = session_bars(chart, day, info["interval"], info["entry_bar"], parse_now(a.now) if a.now else None)
         if len(bars) < 3:
-            raise PlanError("an atr stop needs at least 3 closed %s bars of %s on %s by the entry; found %d"
+            raise PlanError("un stop atr necesita al menos 3 velas cerradas de %s de %s el %s antes de la entrada; hay %d"
                             % (info["interval"], info["symbol"], day, len(bars)))
         atr, atr_n = atr_of(bars)
     c = compute(info["entry"], stop_rule, stop_param, target_rule, target_param, info["or_high"], info["or_low"],
@@ -614,7 +614,7 @@ def build_plan(a, now_utc):
     mrr = cfg.get("min_reward_risk")
     try:
         if mrr is not None and c["reward_risk"] < D(mrr):
-            warnings.append("Reward:risk %s is under your min_reward_risk %s in the config: trader-risk checks that."
+            warnings.append("La relacion riesgo:beneficio %s esta por debajo de tu min_reward_risk %s de la configuracion: trader-risk lo comprueba."
                             % (ratio(c["reward_risk"]), num(D(mrr))))
     except PlanError:
         pass
@@ -626,25 +626,25 @@ def build_plan(a, now_utc):
 
 def describe(plan):
     day = datetime.date.fromisoformat(plan["date"])
-    setup = {"orb": "opening-range breakout", "level": "close above a level"}.get(plan["setup"], plan["setup"])
+    setup = {"orb": "ruptura del rango de apertura", "level": "cierre por encima de un nivel"}.get(plan["setup"], plan["setup"])
     e = D(plan["entry"])
     risk = D(plan["risk_per_share"])
     pct = (risk / e * 100).quantize(CENT, rounding=ROUND_HALF_UP)
     when = ""
     if plan.get("entry_time"):
-        when = " at %s" % plan["entry_time"]
+        when = " a las %s" % plan["entry_time"]
         if plan.get("entry_bar") is not None:
-            when += " (bar %d)" % plan["entry_bar"]
-    out = ["Exit plan: %s long, %s, %s on %s bars" % (
-        plan["symbol"], day.strftime("%a %Y-%m-%d"), setup, "5-minute" if plan["interval"] == "5m" else "1-minute")]
-    out.append("  Entry         %s%s" % (money(plan["entry"]), when))
+            when += " (vela %d)" % plan["entry_bar"]
+    out = ["Plan de salida: %s largo, %s, %s en velas de %s" % (
+        plan["symbol"], day.strftime("%a %Y-%m-%d"), setup, "5 minutos" if plan["interval"] == "5m" else "1 minuto")]
+    out.append("  Entrada       %s%s" % (money(plan["entry"]), when))
     out.append("  Stop          %s  %s%s" % (money(plan["stop"]), plan["stop_label"],
                                              (": " + plan["stop_detail"]) if plan.get("stop_detail") else ""))
     out.append("  Target        %s  %s" % (money(plan["target"]), plan["target_label"]))
-    out.append("  Risk a share  %s (%s%% of the entry)" % (money(plan["risk_per_share"]), pct))
-    out.append("  Reward:risk   %s" % ratio(plan["reward_risk"]))
-    out.append("  Flat by       %s ET, win or lose: no overnight hold" % plan["flat_by"])
-    out.append("Set before the entry. If price hits the stop, you are out; never move it further away.")
+    out.append("  Riesgo/accion %s (%s%% de la entrada)" % (money(plan["risk_per_share"]), pct))
+    out.append("  Riesgo:beneficio %s" % ratio(plan["reward_risk"]))
+    out.append("  Salir antes   %s ET, gane o pierda: sin pasar la noche" % plan["flat_by"])
+    out.append("Fijalo antes de la entrada. Si el precio toca el stop, sales; nunca lo alejes.")
     out.append(NOTE)
     return out
 
@@ -665,21 +665,21 @@ def cmd_plan(a):
     for line in describe(plan):
         print(line)
     for w in warnings:
-        print("Note: " + w)
+        print("Nota: " + w)
     if a.write:
-        print("Wrote %s." % a.write)
-    print("Next: /trader-timemachine replays it, then /trader-budget sizes it to your max loss. Nothing was placed.")
+        print("Guardado %s." % a.write)
+    print("Siguiente: /trader-timemachine la repite, despues /trader-budget calcula el tamano segun tu perdida maxima. No se ha colocado ninguna orden.")
     return 0
 
 
 def cmd_show(a):
     if not os.path.exists(a.plan):
-        print("No plan at %s yet. Make one: exit.py plan --write" % a.plan)
+        print("Todavia no hay plan en %s. Crea uno: exit.py plan --write" % a.plan)
         return 1
     plan = read_json(a.plan, "plan")
     for k in ("symbol", "date", "entry", "stop", "target", "risk_per_share", "reward_risk", "flat_by"):
         if plan.get(k) is None:
-            raise PlanError("%s is missing %r: make a new plan with exit.py plan --write" % (a.plan, k))
+            raise PlanError("a %s le falta %r: crea un plan nuevo con exit.py plan --write" % (a.plan, k))
     if a.json:
         print(json.dumps(plan, indent=2))
         return 0
@@ -687,7 +687,7 @@ def cmd_show(a):
         print(line)
     today = to_eastern(parse_now(a.now)).date().isoformat()
     if plan["date"] != today:
-        print("Note: this plan is for %s, not today (%s)." % (plan["date"], today))
+        print("Nota: este plan es para %s, no para hoy (%s)." % (plan["date"], today))
     return 0
 
 

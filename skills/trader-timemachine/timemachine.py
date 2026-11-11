@@ -95,11 +95,11 @@ COIN_FLIP = 0.05     # verdict thresholds, see the docstring
 STRONG = 0.15
 MANY_NEITHER = 0.40
 EPOCH = datetime.datetime(1970, 1, 1)
-WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+WEEKDAYS = ("lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo")
 NYSE_EARLY_CLOSE = {  # 1:00 p.m. ET, from https://www.nyse.com/markets/hours-calendars (read 2026-10-13)
-    "2026-11-27": "day after Thanksgiving",
+    "2026-11-27": "dia despues de Accion de Gracias",
     "2026-12-24": "Christmas Eve",
-    "2027-11-26": "day after Thanksgiving",
+    "2027-11-26": "dia despues de Accion de Gracias",
 }
 EARLY_MIN = 13 * 60
 
@@ -147,7 +147,7 @@ def parse_now(text):
     try:
         dt = datetime.datetime.fromisoformat(t)
     except ValueError:
-        raise TMError("--now wants a time like \"2026-10-19 10:15\" (New York) or ...Z (UTC)")
+        raise TMError("--now quiere una hora como \"2026-10-19 10:15\" (Nueva York) o ...Z (UTC)")
     if dt.tzinfo is None:
         return eastern_to_utc(dt)
     return (dt - dt.utcoffset()).replace(tzinfo=None)
@@ -161,10 +161,10 @@ def parse_clock(text, what):
     """'10:15 AM', '10:15am', '15:55' or '3:55' (a bare 1 to 8 o'clock means p.m.) -> minutes after midnight."""
     m = re.match(r"^\s*(\d{1,2}):(\d{2})\s*(?:([AaPp])\.?\s*[Mm]\.?)?\s*$", str(text or ""))
     if not m:
-        raise TMError("%s wants a New York time like 10:15 AM or 15:55, not %r" % (what, text))
+        raise TMError("%s quiere una hora de Nueva York como 10:15 AM o 15:55, no %r" % (what, text))
     h, mi, ap = int(m.group(1)), int(m.group(2)), (m.group(3) or "").lower()
     if mi > 59 or h > 23 or (ap and not 1 <= h <= 12):
-        raise TMError("%s %r is not a clock time" % (what, text))
+        raise TMError("%s %r no es una hora valida" % (what, text))
     if ap == "p" and h != 12:
         h += 12
     elif ap == "a" and h == 12:
@@ -223,15 +223,15 @@ def fetch_chart(sym):
                 if e.code == 429 or e.code >= 500:
                     break
                 if e.code == 404:
-                    raise TMError("Yahoo has no chart for %s (HTTP 404): check the ticker" % sym.upper())
-                raise TMError("Yahoo answered HTTP %d for %s" % (e.code, sym.upper()))
+                    raise TMError("Yahoo no tiene grafico para %s (HTTP 404): revisa el ticker" % sym.upper())
+                raise TMError("Yahoo respondio HTTP %d para %s" % (e.code, sym.upper()))
             except urllib.error.URLError as e:
                 raise TMError("could not reach Yahoo: %s" % e.reason)
             except OSError as e:
                 raise TMError("could not reach Yahoo: %s" % e)
     if last == 429:
-        raise TMError("Yahoo is rate limiting (HTTP 429). Wait a minute and run it again.")
-    raise TMError("Yahoo answered HTTP %s for %s on both hosts. Try again later." % (last, sym.upper()))
+        raise TMError("Yahoo esta limitando las peticiones (HTTP 429). Espera un minuto y vuelve a ejecutarlo.")
+    raise TMError("Yahoo respondio HTTP %s para %s en los dos servidores. Vuelve a intentarlo mas tarde." % (last, sym.upper()))
 
 
 def read_offline(path, sym):
@@ -242,29 +242,29 @@ def read_offline(path, sym):
                 path = os.path.join(path, name)
                 break
         else:
-            raise TMError("no %s-60d5m.json(.gz) in %s" % (sym.upper(), path))
+            raise TMError("no hay %s-60d5m.json(.gz) en %s" % (sym.upper(), path))
     if not os.path.exists(path):
-        raise TMError("no offline chart file %s" % path)
+        raise TMError("no hay archivo de grafico sin conexion %s" % path)
     opener = gzip.open if path.endswith(".gz") else open
     try:
         with opener(path, "rt", encoding="utf-8") as fh:
             return fh.read()
     except OSError as e:
-        raise TMError("could not read %s: %s" % (path, e))
+        raise TMError("no pude leer %s: %s" % (path, e))
 
 
 def chart_result(text, sym):
     try:
         data = json.loads(text)
     except ValueError:
-        raise TMError("Yahoo returned something that is not JSON for %s" % sym.upper())
+        raise TMError("Yahoo devolvio algo que no es JSON para %s" % sym.upper())
     chart = data.get("chart") if isinstance(data, dict) else None
     if not isinstance(chart, dict):
-        raise TMError("Yahoo returned something unexpected for %s" % sym.upper())
+        raise TMError("Yahoo devolvio una respuesta inesperada para %s" % sym.upper())
     res = chart.get("result")
     if not res:
         err = chart.get("error") or {}
-        raise TMError("Yahoo has no data for %s: %s" % (sym.upper(), err.get("description") or "unknown ticker"))
+        raise TMError("Yahoo no tiene datos para %s: %s" % (sym.upper(), err.get("description") or "ticker desconocido"))
     return res[0]
 
 
@@ -496,9 +496,9 @@ def _num(v, what):
     try:
         x = float(v)
     except (TypeError, ValueError):
-        raise TMError("the plan needs a number for %s, got %r" % (what, v))
+        raise TMError("el plan necesita un numero para %s, recibido %r" % (what, v))
     if not x > 0 or math.isinf(x):
-        raise TMError("the plan's %s must be a positive price, got %r" % (what, v))
+        raise TMError("el %s del plan debe ser un precio positivo, recibido %r" % (what, v))
     return x
 
 
@@ -507,7 +507,7 @@ def load_plan(a, now_utc):
     if a.symbol:
         missing = [f for f in ("entry", "stop", "target", "entry_time") if getattr(a, f) is None]
         if missing:
-            raise TMError("with --symbol also give %s" % ", ".join("--" + m.replace("_", "-") for m in missing))
+            raise TMError("con --symbol indica tambien %s" % ", ".join("--" + m.replace("_", "-") for m in missing))
         raw = {"symbol": a.symbol, "side": a.side, "date": a.date or to_eastern(now_utc).date().isoformat(),
                "entry": a.entry, "stop": a.stop, "target": a.target, "entry_time": a.entry_time,
                "setup": a.setup, "opening_range": {"minutes": a.or_minutes}, "stop_rule": a.stop_rule,
@@ -515,15 +515,15 @@ def load_plan(a, now_utc):
         src = "flags"
     else:
         if not os.path.exists(a.plan):
-            raise TMError("no plan at %s: run /trader-exit first, or pass --symbol --date --entry --stop "
+            raise TMError("no hay plan en %s: ejecuta antes /trader-exit, o indica --symbol --date --entry --stop "
                           "--target --entry-time" % a.plan)
         try:
             with open(a.plan, encoding="utf-8") as fh:
                 raw = json.load(fh)
         except ValueError as e:
-            raise TMError("%s is not valid JSON: %s" % (a.plan, e))
+            raise TMError("%s no es JSON valido: %s" % (a.plan, e))
         if not isinstance(raw, dict):
-            raise TMError("%s is not a plan" % a.plan)
+            raise TMError("%s no es un plan" % a.plan)
         src = a.plan
     return normalize_plan(raw, src)
 
@@ -532,53 +532,53 @@ def normalize_plan(raw, src="flags"):
     """A plan dict (trader/plan.json shape) -> the checked plan the time machine runs."""
     sym = str(raw.get("symbol") or "").strip().upper()
     if not re.match(r"^[A-Z][A-Z0-9.\-]{0,9}$", sym):
-        raise TMError("the plan needs a ticker symbol, got %r" % raw.get("symbol"))
+        raise TMError("el plan necesita un simbolo de ticker, recibido %r" % raw.get("symbol"))
     side = str(raw.get("side") or "buy").lower()
     if side not in ("buy", "sell"):
-        raise TMError("side must be buy or sell, got %r" % raw.get("side"))
+        raise TMError("side debe ser buy o sell, recibido %r" % raw.get("side"))
     interval = str(raw.get("interval") or "5m")
     if interval != "5m":
-        raise TMError("5-minute bars only (the plan says %s): Yahoo keeps 60 days of 5-min bars but only about "
-                      "7 days of 1-min bars, too few sessions for a fair replay pool" % interval)
+        raise TMError("solo velas de 5 minutos (el plan dice %s): Yahoo guarda 60 dias de velas de 5 minutos pero solo unos "
+                      "7 dias de velas de 1 minuto, pocas sesiones para un conjunto de repeticion justo" % interval)
     try:
         date = datetime.date.fromisoformat(str(raw.get("date") or "")).isoformat()
     except ValueError:
-        raise TMError("the plan needs a date like 2026-10-19, got %r" % raw.get("date"))
+        raise TMError("el plan necesita una fecha como 2026-10-19, recibido %r" % raw.get("date"))
     entry, stop, target = (_num(raw.get(k), k) for k in ("entry", "stop", "target"))
     long = side == "buy"
     if long and not stop < entry < target:
-        raise TMError("a buy needs stop < entry < target (got stop %s, entry %s, target %s)" % (stop, entry, target))
+        raise TMError("una compra necesita stop < entrada < objetivo (stop %s, entrada %s, objetivo %s)" % (stop, entry, target))
     if not long and not target < entry < stop:
-        raise TMError("a sell needs target < entry < stop (got target %s, entry %s, stop %s)" % (target, entry, stop))
+        raise TMError("una venta necesita objetivo < entrada < stop (objetivo %s, entrada %s, stop %s)" % (target, entry, stop))
     k = None
     if raw.get("entry_time"):
         close_min = parse_clock(raw["entry_time"], "entry_time")
         if (close_min - OPEN_MIN) % 5:
-            raise TMError("entry_time %s is not on the 5-minute grid (use the bar's close, e.g. 10:15 AM)"
+            raise TMError("entry_time %s no cae en la rejilla de 5 minutos (usa el cierre de la vela, por ejemplo 10:15 AM)"
                           % raw["entry_time"])
         k = (close_min - OPEN_MIN) // 5 - 1
     if raw.get("entry_bar") is not None:
         try:
             kb = int(raw["entry_bar"])
         except (TypeError, ValueError):
-            raise TMError("entry_bar must be a bar number, got %r" % raw["entry_bar"])
+            raise TMError("entry_bar debe ser un numero de vela, recibido %r" % raw["entry_bar"])
         if k is not None and kb != k:
-            raise TMError("the plan disagrees with itself: entry_bar %d but entry_time %s is bar %d"
+            raise TMError("el plan se contradice: entry_bar %d pero entry_time %s es la vela %d"
                           % (kb, raw["entry_time"], k))
         k = kb
     if k is None:
-        raise TMError("the plan needs entry_time (the entry bar's close, e.g. 10:15 AM) or entry_bar")
+        raise TMError("el plan necesita entry_time (el cierre de la vela de entrada, por ejemplo 10:15 AM) o entry_bar")
     if not 0 <= k <= SESSION_BARS - 2:
-        raise TMError("the entry must close between 9:35 AM and 3:55 PM to leave bars to replay "
-                      "(got %s)" % clock12(OPEN_MIN + 5 * (k + 1)))
+        raise TMError("la entrada debe cerrar entre las 9:35 AM y las 3:55 PM para dejar velas que repetir "
+                      "(recibido %s)" % clock12(OPEN_MIN + 5 * (k + 1)))
     orng = raw.get("opening_range") or {}
     or_min = orng.get("minutes", 15) if isinstance(orng, dict) else 15
     try:
         or_min = int(or_min)
     except (TypeError, ValueError):
-        raise TMError("opening_range.minutes must be a number")
+        raise TMError("opening_range.minutes debe ser un numero")
     if or_min < 5 or or_min % 5 or or_min >= 390:
-        raise TMError("opening_range.minutes must be a multiple of 5 (got %s)" % or_min)
+        raise TMError("opening_range.minutes debe ser multiplo de 5 (recibido %s)" % or_min)
     risk = (entry - stop) if long else (stop - entry)
     return {
         "symbol": sym, "side": side, "date": date, "setup": str(raw.get("setup") or "orb"),
@@ -644,22 +644,22 @@ def verdict(mc):
     pt, ps = mc["p_target"], mc["p_stop"]
     lv = lean(mc)
     if lv is None:
-        return "No replay reached the target or the stop by %s: the price at %s decides every one." % (
+        return "Ninguna repeticion llego al objetivo ni al stop antes de las %s: el precio a las %s decide cada una." % (
             _until12(mc), _until12(mc))
     d, share, even = lv
     r = mc.get("r_at_target") or 1.0
     one_r = abs(r - 1.0) < 0.005
     if abs(d) < COIN_FLIP:
-        head = "Close to a coin flip" if one_r else "Close to break-even"
+        head = "Practicamente a cara o cruz" if one_r else "Practicamente en el punto de equilibrio"
     elif abs(d) < STRONG:
-        head = "Leans toward the target" if d > 0 else "Leans toward the stop"
+        head = "Se inclina hacia el objetivo" if d > 0 else "Se inclina hacia el stop"
     else:
-        head = "Strongly toward the target" if d > 0 else "Strongly toward the stop"
-    odds = "target first %.1f %% vs stop first %.1f %%" % (100 * pt, 100 * ps)
+        head = "Claramente hacia el objetivo" if d > 0 else "Claramente hacia el stop"
+    odds = "objetivo primero %.1f %% frente a stop primero %.1f %%" % (100 * pt, 100 * ps)
     if one_r:
         return "%s: %s." % (head, odds)
-    return ("%s: at %gR the target has to come first in %.0f %% of the replays that hit one side; "
-            "it did in %.0f %% (%s)." % (head, round(r, 2), 100 * even, 100 * share, odds))
+    return ("%s: con %gR el objetivo tiene que llegar primero en el %.0f %% de las repeticiones que tocan un lado; "
+            "llego primero en el %.0f %% (%s)." % (head, round(r, 2), 100 * even, 100 * share, odds))
 
 
 def verdict_notes(mc):
@@ -667,58 +667,58 @@ def verdict_notes(mc):
     notes = []
     pn = mc.get("p_neither", 0)
     if pn > MANY_NEITHER and lean(mc) is not None:
-        notes.append("%.1f %% of the replays hit neither by %s; the price at %s decides those."
+        notes.append("El %.1f %% de las repeticiones no toca ninguno antes de las %s; el precio a las %s decide esas."
                      % (100 * pn, _until12(mc), _until12(mc)))
     lv = lean(mc)
     avg = mc.get("avg_R")
     if lv and abs(lv[0]) >= COIN_FLIP and avg is not None and avg != 0 and (avg > 0) != (lv[0] > 0):
-        notes.append("Average R is %+.3f all the same: the replays that hit neither pull it the other way." % avg)
+        notes.append("La R media es %+.3f igualmente: las repeticiones que no tocan ninguno la empujan en sentido contrario." % avg)
     return notes
 
 
 def time_machine(text, plan, now_utc, replays=10000, seed=19, window=2, until=None, source="yahoo"):
     """Chart JSON text + a normalized plan -> the timemachine.json document."""
     if not 1 <= replays <= 1000000:
-        raise TMError("--replays must be between 1 and 1,000,000")
+        raise TMError("--replays debe estar entre 1 y 1.000.000")
     if not 0 <= window <= 10:
-        raise TMError("--window must be between 0 and 10 bars")
+        raise TMError("--window debe estar entre 0 y 10 velas")
     sym = plan["symbol"]
     result = chart_result(text, sym)
     meta, bars, dropped = parse_bars(result, now_utc)
     msym = str(meta.get("symbol") or "").upper()
     if msym and msym != sym.replace(".", "-"):
-        raise TMError("the data is for %s but the plan is for %s" % (msym, sym))
+        raise TMError("los datos son de %s pero el plan es para %s" % (msym, sym))
     gran = meta.get("dataGranularity")
     if gran and gran != "5m":
-        raise TMError("the data has %s bars; the time machine needs 5-minute bars" % gran)
+        raise TMError("los datos tienen velas de %s; la maquina del tiempo necesita velas de 5 minutos" % gran)
     if not bars:
-        raise TMError("no complete 5-minute bars for %s in the data" % sym)
+        raise TMError("no hay velas completas de 5 minutos de %s en los datos" % sym)
     k = plan["entry_bar"]
     early = plan["date"] in NYSE_EARLY_CLOSE
     end_min = EARLY_MIN if early else CLOSE_MIN
     until_min = end_min if until is None else parse_clock(until, "--until")
     if (until_min - OPEN_MIN) % 5 or until_min > end_min:
-        raise TMError("--until must be on the 5-minute grid and no later than %s%s"
-                      % (clock12(end_min), " (an early close)" if early else ""))
+        raise TMError("--until debe caer en la rejilla de 5 minutos y no ser posterior a las %s%s"
+                      % (clock12(end_min), " (cierre anticipado)" if early else ""))
     last = (until_min - OPEN_MIN) // 5 - 1
     if last <= k:
-        raise TMError("--until %s leaves nothing to replay after the %s entry" % (clock12(until_min),
+        raise TMError("--until %s no deja nada que repetir despues de la entrada de las %s" % (clock12(until_min),
                                                                              plan["entry_time"]))
     days = split_sessions(bars)
     entry_day = days.get(plan["date"], {})
     if k not in entry_day:
-        reason = ("no bars for that day" if not entry_day else
-                  "the data stops at the %s bar" % entry_day[max(entry_day)]["start"])
-        raise TMError("the entry is not in the data: no complete %s bar (closing %s) on %s for %s (%s)"
+        reason = ("no hay velas ese dia" if not entry_day else
+                  "los datos acaban en la vela de las %s" % entry_day[max(entry_day)]["start"])
+        raise TMError("la entrada no esta en los datos: no hay vela completa de las %s (cierre %s) el %s para %s (%s)"
                       % (clock24(OPEN_MIN + 5 * k), plan["entry_time"], plan["date"], sym, reason))
     eb = entry_day[k]
     warn = []
     if not eb["l"] - 0.01 <= plan["entry"] <= eb["h"] + 0.01:
-        warn.append("the plan's entry %.2f is outside that bar's range %.2f to %.2f"
+        warn.append("la entrada del plan %.2f esta fuera del rango de esa vela, de %.2f a %.2f"
                     % (plan["entry"], eb["l"], eb["h"]))
     sessions, short = full_sessions(days, plan["date"])
     if len(sessions) < MIN_SESSIONS:
-        raise TMError("only %d full session(s) of %s before %s in the data; the time machine needs at least %d"
+        raise TMError("solo hay %d sesion(es) completas de %s antes del %s en los datos; la maquina del tiempo necesita al menos %d"
                       % (len(sessions), sym, plan["date"], MIN_SESSIONS))
     pool = build_pool(sessions)
     mc = simulate(pool, plan["entry"], plan["stop"], plan["target"], k, last, replays, seed, window, plan["side"])
@@ -732,8 +732,8 @@ def time_machine(text, plan, now_utc, replays=10000, seed=19, window=2, until=No
         history = history_replay(sessions, rule, last, plan["side"])
     else:
         history = {"sessions": len(sessions), "triggered": 0, "rule": None, "trades": [],
-                   "note": "skipped: the history replay knows the opening-range breakout (orb) only, "
-                           "this plan's setup is %r" % plan["setup"]}
+                   "note": "omitido: la repeticion historica solo conoce la ruptura del rango de apertura (orb), "
+                           "la configuracion de este plan es %r" % plan["setup"]}
     last_bar = bars[-1]
     return {
         "created_by": "trader-timemachine",
@@ -748,8 +748,8 @@ def time_machine(text, plan, now_utc, replays=10000, seed=19, window=2, until=No
         "verdict": verdict(mc),
         "verdict_notes": verdict_notes(mc),
         "warnings": warn,
-        "note": ("A simulation built from %s's own last %d full sessions. It is not a prediction: earnings, "
-                 "news and halts can do things those sessions never did. Same seed, same numbers." % (sym, len(sessions))),
+        "note": ("Simulacion construida con las ultimas %d sesiones completas de %s. No es una prediccion: resultados, "
+                 "noticias y paradas pueden hacer cosas que esas sesiones nunca hicieron. Misma semilla, mismos numeros." % (len(sessions), sym)),
     }
 
 
@@ -766,48 +766,48 @@ def report(doc):
     wd = WEEKDAYS[datetime.date.fromisoformat(p["date"]).weekday()]
     r = p["target_r"]
     lines = [
-        "%s %s, %s %s: entry %.2f at %s (bar %d), stop %.2f, target %.2f (%sR, risk %.2f a share)."
+        "%s %s, %s %s: entrada %.2f a las %s (vela %d), stop %.2f, objetivo %.2f (%sR, riesgo %.2f por accion)."
         % (p["symbol"], p["side"], wd, p["date"], p["entry"], p["entry_time"], p["entry_bar"], p["stop"],
            p["target"], ("%g" % r), p["risk_per_share"]),
-        "%s replays of the rest of the session, %s to %s (%d five-minute bars), seed %d."
+        "%s repeticiones del resto de la sesion, de las %s a las %s (%d velas de cinco minutos), semilla %d."
         % ("{:,}".format(m["replays"]), p["entry_time"], until, m["bars_left"], m["seed"]),
-        "Each bar is drawn whole from %s's own 5-min bars at the same time of day (+-%d bars) over its last "
-        "%d full sessions (%s to %s)." % (p["symbol"], m["window"], m["pool_sessions"], m["pool_from"], m["pool_to"]),
+        "Cada vela se dibuja entera a partir de las velas de 5 minutos de %s a la misma hora del dia (+-%d velas) en sus ultimas "
+        "%d sesiones completas (de %s a %s)." % (p["symbol"], m["window"], m["pool_sessions"], m["pool_from"], m["pool_to"]),
         "",
-        "  target first   %s" % pc(m["p_target"]),
-        "  stop first     %s" % pc(m["p_stop"]),
-        "  neither        %-8s still open at %s" % (pc(m["p_neither"]), until),
-        "  green          %-8s target first, or %s the entry at %s" % (pc(m["p_green"]),
-                                                                       "above" if long else "below", until),
+        "  objetivo primero  %s" % pc(m["p_target"]),
+        "  stop primero      %s" % pc(m["p_stop"]),
+        "  ninguno        %-8s sigue abierta a las %s" % (pc(m["p_neither"]), until),
+        "  verde          %-8s objetivo primero, o %s la entrada a las %s" % (pc(m["p_green"]),
+                                                                       "por encima de" if long else "por debajo de", until),
         "",
-        "  Price at %s: median %.2f, 90 %% of replays between %.2f and %.2f."
+        "  Precio a las %s: mediana %.2f, el 90 %% de las repeticiones entre %.2f y %.2f."
         % (until, m["median_close"], m["p5_close"], m["p95_close"]),
-        "  Average R: %+.3f (R = the %.2f risk: %sR at the target, -1R at the stop)."
+        "  R media: %+.3f (R = el riesgo de %.2f: %sR en el objetivo, -1R en el stop)."
         % (m["avg_R"], p["risk_per_share"], ("+%g" % m["r_at_target"]), ),
         "",
     ]
     if h.get("rule"):
         ru = h["rule"]
-        stop_words = {"or_mid": "opening-range midpoint", "or_low": "opening-range low",
-                      "or_high": "opening-range high"}.get(ru["stop_rule"],
-                                                           "%.2f %% from the entry" % ru.get("stop_pct", 0))
+        stop_words = {"or_mid": "punto medio del rango de apertura", "or_low": "minimo del rango de apertura",
+                      "or_high": "maximo del rango de apertura"}.get(ru["stop_rule"],
+                                                           "%.2f %% desde la entrada" % ru.get("stop_pct", 0))
         if h["triggered"]:
-            lines.append("History: the same rule (%d-min opening range, stop at the %s, %gR target) on each of "
-                         "those %d real sessions fired %d times: %d target, %d stop, %d neither. Average R %+.3f."
+            lines.append("Historia: la misma regla (rango de apertura de %d min, stop en el %s, objetivo %gR) en cada una de "
+                         "esas %d sesiones reales se activo %d veces: %d objetivo, %d stop, %d ninguno. R media %+.3f."
                          % (ru["or_minutes"], stop_words, ru["target_r"], h["sessions"], h["triggered"],
                             h["target"], h["stop"], h["close"], h["avg_R"]))
         else:
-            lines.append("History: the same rule never fired in those %d sessions." % h["sessions"])
+            lines.append("Historia: la misma regla no se activo en esas %d sesiones." % h["sessions"])
     else:
-        lines.append("History: " + h.get("note", "skipped."))
+        lines.append("Historia: " + h.get("note", "omitido."))
     lines += ["", doc["verdict"]] + list(doc.get("verdict_notes") or []) + [""]
     for w in doc.get("warnings") or []:
-        lines.append("Note: " + w + ".")
+        lines.append("Nota: " + w + ".")
     if doc["data"]["short_sessions_left_out"]:
-        lines.append("Left out %d short session(s) (half days or gaps): %s."
+        lines.append("Se han dejado fuera %d sesion(es) corta(s) (medios dias o huecos): %s."
                      % (len(doc["data"]["short_sessions_left_out"]),
                         ", ".join(x["date"] for x in doc["data"]["short_sessions_left_out"])))
-    lines.append(doc["note"] + " Repeat this run with --seed %d." % m["seed"])
+    lines.append(doc["note"] + " Repite esta ejecucion con --seed %d." % m["seed"])
     return lines
 
 
@@ -836,7 +836,7 @@ def render_chart(doc, height=17):
         marks[row(p["entry"])] = "entry"
     for r in (row(p["target"]), row(p["stop"])):
         grid[r] = ["-" if ch == " " else ch for ch in grid[r]]
-    out = ["%s %s, %s replay paths from the %s entry (seed %d)" % (
+    out = ["%s %s, %s trayectorias desde la entrada de las %s (semilla %d)" % (
         p["symbol"], p["date"], "{:,}".format(m.get("band_paths", BAND_PATHS)), p["entry_time"], m["seed"])]
     for r in range(height):
         label = marks.get(r)
@@ -887,21 +887,21 @@ def cmd_run(a):
     else:
         print("\n".join(report(doc)))
         if a.write:
-            print("Wrote %s." % a.write)
-        print("Next: /trader-budget sizes it to your budget and your max loss per trade.")
+            print("Guardado %s." % a.write)
+        print("Siguiente: /trader-budget la ajusta a tu presupuesto y a tu perdida maxima por operacion.")
     return 0
 
 
 def cmd_chart(a):
     if a.from_file:
         if not os.path.exists(a.from_file):
-            raise TMError("no %s: run timemachine.py run --write first" % a.from_file)
+            raise TMError("no existe %s: ejecuta antes timemachine.py run --write" % a.from_file)
         try:
             with open(a.from_file, encoding="utf-8") as fh:
                 doc = json.load(fh)
             doc["mc"]["bands"]
         except (ValueError, KeyError, TypeError):
-            raise TMError("%s is not a time machine result" % a.from_file)
+            raise TMError("%s no es un resultado de la maquina del tiempo" % a.from_file)
     else:
         doc = compute(a)
     print("\n".join(render_chart(doc)))

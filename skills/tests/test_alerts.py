@@ -189,7 +189,7 @@ class Network(unittest.TestCase):
         f = self.net([500, 502])
         q, errors = alerts.get_quotes(["TSLA"])
         self.assertEqual(q, {})
-        self.assertIn("query1.finance.yahoo.com/v8/finance/chart/TSLA answered HTTP 502", errors[0])
+        self.assertIn("query1.finance.yahoo.com/v8/finance/chart/TSLA respondio HTTP 502", errors[0])
 
     def test_a_404_is_yahoos_answer_and_a_403_is_not_retried(self):
         f = self.net([404])
@@ -222,14 +222,14 @@ class Rules(unittest.TestCase):
         rules = [{"id": "aapl-340", "symbol": "AAPL", "type": "above", "price": 340}]
         rings, st = alerts.evaluate(rules, self.q, self.open, {}, self.now)
         self.assertEqual(len(rings), 1)
-        self.assertIn("AAPL is $341.27: at or above your alert level $340", rings[0]["message"])
+        self.assertIn("AAPL esta en $341.27: en o por encima de tu nivel de alerta $340", rings[0]["message"])
         rings, st = alerts.evaluate(rules, self.q, self.open, st, self.now)
         self.assertEqual(rings, [])
 
     def test_stop_and_rearm(self):
         rules = [{"id": "bac-stop", "symbol": "BAC", "type": "stop", "price": 54, "rearm": True}]
         rings, st = alerts.evaluate(rules, self.q, self.open, {}, self.now)
-        self.assertIn("your stop $54", rings[0]["message"])
+        self.assertIn("tu stop $54", rings[0]["message"])
         self.q["BAC"]["price"] = 55.0
         rings, st = alerts.evaluate(rules, self.q, self.open, st, self.now)
         self.assertEqual(rings, [])
@@ -249,14 +249,14 @@ class Rules(unittest.TestCase):
         self.assertEqual(alerts.evaluate(up, self.q, self.open, {}, self.now)[0], [])
         tsla = [{"id": "tsla-3", "symbol": "TSLA", "type": "pct_move", "pct": 3}]
         rings, _ = self.at("2026-10-19 10:52", tsla)
-        self.assertIn("TSLA moved +3.31% to $366.48 (from $354.72)", rings[0]["message"])
+        self.assertIn("TSLA se movio +3.31% hasta $366.48 (desde $354.72)", rings[0]["message"])
 
     def test_opening_bell_once_per_trading_day(self):
         rules = [{"id": "bell", "type": "opening_bell"}]
         closed = alerts.market_status(ny("2026-10-13T08:00"))
         self.assertEqual(alerts.evaluate(rules, {}, closed, {}, ny("2026-10-13T08:00"))[0], [])
         rings, st = alerts.evaluate(rules, {}, self.open, {}, self.now)
-        self.assertIn("Opening bell", rings[0]["message"])
+        self.assertIn("Campana de apertura", rings[0]["message"])
         self.assertEqual(alerts.evaluate(rules, {}, self.open, st, ny("2026-10-13T11:00"))[0], [])
         nxt = alerts.market_status(ny("2026-10-14T09:31"))
         self.assertEqual(len(alerts.evaluate(rules, {}, nxt, st, ny("2026-10-14T09:31"))[0]), 1)
@@ -274,7 +274,7 @@ class Rules(unittest.TestCase):
         q["TSLA"]["price"] = 358.10
         rings, st = self.at("2026-10-19 11:30", rules, st, q)
         self.assertEqual([r["id"] for r in rings], ["tsla-plan-stop"])
-        self.assertIn("TSLA is $358.10: at or below your stop $358.32 (plan stop: opening-range midpoint)",
+        self.assertIn("TSLA is $358.10: at or below your stop $358.32 (plan stop: punto medio del rango de apertura)",
                       rings[0]["message"])
         q["TSLA"]["price"] = 370.04
         self.assertEqual([r["id"] for r in self.at("2026-10-19 12:00", rules, st, q)[0]], ["tsla-plan-target"])
@@ -295,7 +295,7 @@ class Rules(unittest.TestCase):
         rule = [{"id": "flat", "type": "time", "at": "15:55", "label": "flat by close", "before_close": True}]
         self.assertEqual(self.at("2026-11-27 12:54", rule)[0], [])
         rings, _ = self.at("2026-11-27 12:55", rule)
-        self.assertIn("set for 12:55), the market closes at 13:00", rings[0]["message"])
+        self.assertIn("fijada para 12:55), el mercado cierra a las 13:00", rings[0]["message"])
         plain = [{"id": "t", "type": "time", "at": "15:55", "label": "check"}]
         self.assertEqual(self.at("2026-11-27 12:55", plain)[0], [])
         self.assertEqual(self.at("2026-10-17 15:56", rule)[0], [])         # Saturday: no session
@@ -348,7 +348,7 @@ class Cli(unittest.TestCase):
         self.assertEqual(code, 0)                                      # the opening bell rings first
         code, text, _ = self.check("2026-10-19 10:53")
         self.assertEqual(code, 1)
-        self.assertIn("Nothing hit. 4 rule(s) watched today, TSLA $366.48.", text)
+        self.assertIn("Ninguna se ha cumplido. 4 rule(s) watched today, TSLA $366.48.", text)
         with open(self.prices) as fh:
             doc = json.load(fh)
         self.assertEqual(doc["prices"], {"TSLA": 366.475})
@@ -361,9 +361,9 @@ class Cli(unittest.TestCase):
         self.assertIn("not an order", text)
         self.assertEqual(self.check("2026-10-19 15:57")[0], 1)
         code, text, _ = self.check("2026-10-20 10:00")
-        self.assertIn("ALERT Opening bell", text)
+        self.assertIn("ALERT Campana de apertura", text)
         code, text, _ = self.check("2026-10-20 10:05")
-        self.assertIn("Nothing hit. 1 rule(s) watched today.", text)
+        self.assertIn("Ninguna se ha cumplido. 1 rule(s) watched today.", text)
 
         # a new plan replaces the plan rules and re-arms them
         code, text, _ = run(["add", "--from-plan", "--plan", PLAN, "--rules", self.rules, "--state", self.state])
@@ -379,18 +379,18 @@ class Cli(unittest.TestCase):
             self.assertEqual(code, 0)
         code, _, err = run(["add", "--rules", self.rules, "--symbol", "AAPL", "--above", "350"])
         self.assertEqual(code, 1)
-        self.assertIn("already exists", err)
+        self.assertIn("ya existe", err)
 
         code, text, _ = self.check("2026-10-13T20:00")
         self.assertEqual(code, 1)
-        self.assertIn("Nothing hit", text)
+        self.assertIn("Ninguna se ha cumplido", text)
         with open(self.prices) as fh:
             doc = json.load(fh)
         self.assertEqual(doc["prices"], {"AAPL": 341.27, "BAC": 53.96})
 
         code, text, _ = self.check("2026-10-14T09:31")
         self.assertEqual(code, 0)
-        self.assertIn("ALERT Opening bell", text)
+        self.assertIn("ALERT Campana de apertura", text)
         code, text, _ = self.check("2026-10-14T09:45")
         self.assertEqual(code, 1)
 
@@ -415,14 +415,14 @@ class Cli(unittest.TestCase):
         self.assertEqual(run(["add", "--rules", self.rules, "--at", "4pm"])[0], 1)
         code, _, err = run(["add", "--rules", self.rules, "--from-plan", "--plan", os.path.join(self.d, "none")])
         self.assertEqual(code, 1)
-        self.assertIn("no plan", err)
+        self.assertIn("no hay plan", err)
 
     def test_quote_write_merges(self):
         code, text, _ = run(["quote", "AAPL", "KO", "--offline", QDIR, "--write", self.prices,
                              "--now", "2026-10-13T20:00:01Z"])
         self.assertEqual(code, 0)
         self.assertIn("AAPL   $341.27", text)
-        self.assertIn("delayed", text)
+        self.assertIn("retraso", text)
         run(["quote", "BAC", "--offline", QDIR, "--write", self.prices])
         with open(self.prices) as fh:
             doc = json.load(fh)
@@ -447,7 +447,7 @@ class Cli(unittest.TestCase):
     def test_check_without_rules(self):
         code, _, err = run(["check", "--rules", self.rules, "--offline", QDIR])
         self.assertEqual(code, 1)
-        self.assertIn("no rules", err)
+        self.assertIn("no hay reglas", err)
 
 
 if __name__ == "__main__":

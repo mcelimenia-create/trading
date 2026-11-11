@@ -179,7 +179,7 @@ def parse_now(text):
 def parse_hhmm(text, what):
     m = re.match(r"^\s*(\d{1,2}):(\d{2})\s*$", str(text))
     if not m or int(m.group(1)) > 23 or int(m.group(2)) > 59:
-        raise EntryError("%s wants a New York time like 15:30, not %r" % (what, text))
+        raise EntryError("%s quiere una hora de Nueva York como 15:30, no %r" % (what, text))
     return datetime.time(int(m.group(1)), int(m.group(2)))
 
 
@@ -243,12 +243,12 @@ def chart_range(day, today, interval):
     if back <= 6:
         return "5d"
     if interval == "1m":
-        raise EntryError("Yahoo keeps 1-minute bars for about a week: use --interval 5m for %s" % day)
+        raise EntryError("Yahoo guarda las velas de 1 minuto unos siete dias: usa --interval 5m para %s" % day)
     if back <= 28:
         return "1mo"
     if back <= 58:
         return "60d"
-    raise EntryError("Yahoo keeps 5-minute bars for about 60 days: %s is too far back" % day)
+    raise EntryError("Yahoo guarda las velas de 5 minutos unos 60 dias: %s es demasiado antiguo" % day)
 
 
 def _open_url(url, timeout=20):
@@ -264,7 +264,7 @@ def _sleep(seconds):
 def yahoo_get(path):
     """GET a Yahoo path: query2 first, query1 when query2 answers 429 or 5xx.
     An HTTP 429 gets one retry on the same host after BACKOFF seconds."""
-    last = "no answer"
+    last = "sin respuesta"
     for host in HOSTS:
         url = "https://%s.finance.yahoo.com%s" % (host, path)
         for attempt in (0, 1):
@@ -282,7 +282,7 @@ def yahoo_get(path):
                 if code == 404:
                     if body:
                         return body
-                    raise EntryError("Yahoo has no chart at %s (HTTP 404)" % url.split("?")[0])
+                    raise EntryError("Yahoo no tiene grafico para %s (HTTP 404)" % url.split("?")[0])
                 last = "HTTP %d" % code
                 if code == 429 and attempt == 0:
                     _sleep(BACKOFF)
@@ -291,12 +291,12 @@ def yahoo_get(path):
                     break
                 raise EntryError("Yahoo answered HTTP %d for %s" % (code, url.split("?")[0]))
             except urllib.error.URLError as e:
-                last = "could not connect: %s" % (e.reason,)
+                last = "no pude conectar: %s" % (e.reason,)
                 break
             except OSError as e:
-                last = "network error: %s" % (e,)
+                last = "error de red: %s" % (e,)
                 break
-    raise EntryError("Yahoo did not answer (%s on query2 and query1): wait a minute and try again" % last)
+    raise EntryError("Yahoo no respondio (%s en query2 y query1): espera un minuto y vuelve a intentarlo" % last)
 
 
 def parse_chart(text, sym):
@@ -306,10 +306,10 @@ def parse_chart(text, sym):
         data = json.loads(text)
         res = data["chart"]["result"]
     except (ValueError, KeyError, TypeError):
-        raise EntryError("Yahoo returned something unexpected for %s" % sym)
+        raise EntryError("Yahoo devolvio una respuesta inesperada para %s" % sym)
     if not res:
         err = (data.get("chart") or {}).get("error") or {}
-        raise EntryError("Yahoo has no data for %s: %s" % (sym, err.get("description") or "unknown ticker"))
+        raise EntryError("Yahoo no tiene datos para %s: %s" % (sym, err.get("description") or "ticker desconocido"))
     r = res[0] or {}
     meta = r.get("meta") or {}
     q = ((r.get("indicators") or {}).get("quote") or [{}])[0] or {}
@@ -345,9 +345,9 @@ def offline_file(path, sym):
             p = os.path.join(path, name)
             if os.path.exists(p):
                 return p
-        raise EntryError("no offline file for %s in %s (want %s.json)" % (sym, path, sym))
+        raise EntryError("no hay archivo sin conexion para %s en %s (se espera %s.json)" % (sym, path, sym))
     if not os.path.exists(path):
-        raise EntryError("no offline file %s" % path)
+        raise EntryError("no hay archivo sin conexion %s" % path)
     return path
 
 
@@ -359,16 +359,16 @@ def get_chart(sym, interval, day=None, offline=None, today=None):
         try:
             text = read_text(f)
         except (OSError, ValueError) as e:
-            raise EntryError("could not read %s: %s" % (f, e))
+            raise EntryError("no pude leer %s: %s" % (f, e))
     else:
         today = today or to_eastern(utc_now()).date()
         text = yahoo_get(chart_path(sym, chart_range(day or today, today, interval), interval))
     ch = parse_chart(text, sym)
     if ch["symbol"] != yahoo_symbol(sym):
-        raise EntryError("the chart file holds %s, not %s" % (ch["symbol"], sym))
+        raise EntryError("el archivo del grafico contiene %s, no %s" % (ch["symbol"], sym))
     gran = ch["meta"].get("dataGranularity")
     if gran and gran != interval:
-        raise EntryError("%s has %s bars, not %s: use --interval %s" % (sym, gran, interval, gran))
+        raise EntryError("%s tiene velas de %s, no %s: usa --interval %s" % (sym, gran, interval, gran))
     return ch
 
 
@@ -381,7 +381,7 @@ def read_config(path):
             with open(path, encoding="utf-8") as fh:
                 doc = json.load(fh)
         except ValueError as e:
-            raise EntryError("%s is not valid JSON: %s" % (path, e))
+            raise EntryError("%s no es JSON valido: %s" % (path, e))
         for k in DEFAULTS:
             if doc.get(k):
                 cfg[k] = doc[k]
@@ -410,14 +410,14 @@ def evaluate(chart, now_utc, setup="orb", or_minutes=15, interval="5m", level=No
     """Pure function: the setup's status at now_utc from one session's bars."""
     cfg = cfg or dict(DEFAULTS)
     if interval not in INTERVALS:
-        raise EntryError("--interval is 5m or 1m")
+        raise EntryError("--interval debe ser 5m o 1m")
     step = INTERVALS[interval]
     if or_minutes <= 0 or (or_minutes * 60) % step:
-        raise EntryError("--or-minutes must be a whole number of %s bars" % interval)
+        raise EntryError("--or-minutes debe ser un numero entero de velas de %s" % interval)
     if setup not in ("orb", "level"):
-        raise EntryError("--setup is orb or level")
+        raise EntryError("--setup debe ser orb o level")
     if setup == "level" and level is None:
-        raise EntryError("--setup level needs --level PRICE (for example a 20-day high)")
+        raise EntryError("--setup level necesita --level PRECIO (por ejemplo, un maximo de 20 dias)")
     n_or = or_minutes * 60 // step
     local = to_eastern(now_utc)
     day = local.date()
@@ -430,7 +430,7 @@ def evaluate(chart, now_utc, setup="orb", or_minutes=15, interval="5m", level=No
     res["data_time"] = to_eastern(utc_of(dt)).strftime("%Y-%m-%d %H:%M:%S") if dt else None
     ok, why = trading_day(day)
     if not ok:
-        res.update(status="no-data", phase="closed", reason="the NYSE is closed today (%s)" % why,
+        res.update(status="no-data", phase="closed", reason="la NYSE esta cerrada hoy (%s)" % why,
                    next_open=next_open(day))
         return res
     o, c = session(day)
@@ -466,8 +466,8 @@ def evaluate(chart, now_utc, setup="orb", or_minutes=15, interval="5m", level=No
             else:
                 pending = b
                 res["forming"] = {"bar_start": hm(b["et"]), "closes": ampm(b["end"]), "price": r2(b["c"])}
-                res["lag_note"] = ("Yahoo's last trade is %s, before the %s bar's close: it counts once Yahoo "
-                                   "catches up (a minute at most)" % (to_eastern(utc_of(dt)).strftime("%H:%M:%S"),
+                res["lag_note"] = ("El ultimo precio de Yahoo es de las %s, antes del cierre de la vela de las %s: cuenta cuando Yahoo "
+                                   "se ponga al dia (un minuto como mucho)" % (to_eastern(utc_of(dt)).strftime("%H:%M:%S"),
                                                                        short(b["et"])))
         elif b["et"] <= local:
             res["forming"] = {"bar_start": hm(b["et"]), "closes": ampm(b["end"]), "price": r2(b["c"])}
@@ -475,8 +475,8 @@ def evaluate(chart, now_utc, setup="orb", or_minutes=15, interval="5m", level=No
     res["bars_closed"] = len(bars)
 
     if local < open_dt:
-        res.update(phase="pre-open", reason="the NYSE opens at 9:30%s" % (
-            " and the %d-minute range is set at %s" % (or_minutes, short(or_end)) if setup == "orb" else ""))
+        res.update(phase="pre-open", reason="la NYSE abre a las 9:30%s" % (
+            " y el rango de %d minutos se fija a las %s" % (or_minutes, short(or_end)) if setup == "orb" else ""))
         return res
 
     or_bars = [b for b in bars if b["slot"] < n_or]
@@ -491,7 +491,7 @@ def evaluate(chart, now_utc, setup="orb", or_minutes=15, interval="5m", level=No
                 len(or_bars), n_or, short(or_end)))
             return res
         if not or_bars:
-            res.update(status="no-data", phase="open", reason="Yahoo sent no bars for the opening range")
+            res.update(status="no-data", phase="open", reason="Yahoo no envio velas del rango de apertura")
             return res
         lvl = max(b["h"] for b in or_bars)
     else:
@@ -518,36 +518,36 @@ def evaluate(chart, now_utc, setup="orb", or_minutes=15, interval="5m", level=No
     if trig:
         vx = (trig["v"] / avg_vol) if avg_vol else None
         res.update(status="triggered", phase="open" if local < close_dt else "after-close",
-                   reason="the %s bar closed above %s" % (short(trig["et"]), "the range high" if setup == "orb" else "the level"))
+                   reason="la vela de las %s cerro por encima %s" % (short(trig["et"]), "del maximo del rango" if setup == "orb" else "del nivel"))
         res["trigger"] = {"time": ampm(trig["end"]), "close_time": hm(trig["end"]), "bar_start": hm(trig["et"]),
                           "bar_index": trig["slot"], "price": r2(trig["c"]), "close": trig["c"],
                           "volume": trig["v"], "volume_x": r2(vx), "pct_over": r2(100.0 * (trig["c"] / lvl - 1))}
         res["minutes_since"] = int((local - trig["end"]).total_seconds() // 60)
         if dt and utc_of(dt) < eastern_to_utc(trig["end"]):
-            res["data_note"] = ("Yahoo's last trade is %s, before this bar closed: its close can still move a cent or two"
+            res["data_note"] = ("El ultimo precio de Yahoo es de las %s, antes del cierre de esta vela: el cierre aun puede moverse un centimo o dos"
                                 % to_eastern(utc_of(dt)).strftime("%H:%M:%S"))
         return res
     if not bars:
-        res.update(status="no-data", phase="open", reason="Yahoo sent no bars for %s yet" % day.isoformat())
+        res.update(status="no-data", phase="open", reason="Yahoo no ha enviado velas de %s todavia" % day.isoformat())
         return res
-    what = "close above the range high $%.2f" % lvl if setup == "orb" else "close above $%.2f" % lvl
+    what = "cierre por encima del maximo del rango $%.2f" % lvl if setup == "orb" else "cierre por encima de $%.2f" % lvl
     if local >= cutoff and not (pending and pending["end"] <= cutoff):
         res.update(status="expired", phase="after-close" if local >= close_dt else "after-cutoff",
-                   reason="no %s by %s, the last time for a new entry%s" % (
-                       what, short(cutoff), " (1:00 p.m. early close today)" if early else ""))
+                   reason="no hay %s antes de las %s, la ultima hora para entrar%s" % (
+                       what, short(cutoff), " (cierre anticipado a las 13:00 hoy)" if early else ""))
         return res
     res["phase"] = "open"
     if last["c"] > lvl and last in thin:
-        res["reason"] = "the %s bar closed above at $%.2f but on %.2fx the range's volume, under your %.2fx" % (
+        res["reason"] = "la vela de las %s cerro por encima en $%.2f pero con %.2fx del volumen del rango, por debajo de tu %.2fx" % (
             short(last["et"]), last["c"], last["v"] / avg_vol if avg_vol else 0, min_volume_x)
     elif last["c"] > lvl and last["end"] < before:
-        res["reason"] = "the %s bar closed above at $%.2f, but no entries before %s (config)" % (
+        res["reason"] = "la vela de las %s cerro por encima en $%.2f, pero no se entra antes de las %s (config)" % (
             short(last["et"]), last["c"], short(before))
     else:
         gap = lvl - last["c"]
-        res["reason"] = "last close $%.2f (%s bar), $%.2f %s %s (%+.2f%%)" % (
-            last["c"], short(last["et"]), abs(gap), "under" if gap >= 0 else "over",
-            "the range high $%.2f" % lvl if setup == "orb" else "the level $%.2f" % lvl,
+        res["reason"] = "ultimo cierre $%.2f (vela de las %s), $%.2f %s %s (%+.2f%%)" % (
+            last["c"], short(last["et"]), abs(gap), "por debajo" if gap >= 0 else "por encima",
+            "del maximo del rango $%.2f" % lvl if setup == "orb" else "del nivel $%.2f" % lvl,
             100.0 * (last["c"] / lvl - 1))
     return res
 
@@ -580,52 +580,52 @@ def write_json(path, doc):
 
 # ---------------------------------------------------------------- words
 
-LABEL = {"triggered": "TRIGGERED", "waiting": "WAITING", "expired": "EXPIRED", "no-data": "NO DATA"}
-PHASE_LABEL = {"pre-open": "NOT OPEN YET", "forming": "RANGE FORMING", "closed": "MARKET CLOSED"}
-SHORT = {"pre-open": "not open", "forming": "forming", "closed": "closed"}
+LABEL = {"triggered": "ACTIVADA", "waiting": "EN ESPERA", "expired": "CADUCADA", "no-data": "SIN DATOS"}
+PHASE_LABEL = {"pre-open": "AUN NO ABIERTA", "forming": "RANGO EN FORMACION", "closed": "MERCADO CERRADO"}
+SHORT = {"pre-open": "no abierta", "forming": "formando", "closed": "cerrada"}
 
 
 def setup_name(res):
     if res["setup"] == "orb":
-        return "opening-range breakout (%d-minute range)" % res["or_minutes"]
-    return "close above $%.2f" % res["level"] if res["level"] is not None else "close above a level"
+        return "ruptura del rango de apertura (rango de %d minutos)" % res["or_minutes"]
+    return "cierre por encima de $%.2f" % res["level"] if res["level"] is not None else "cierre por encima de un nivel"
 
 
 def describe(res):
     """Plain lines for a person."""
     when = datetime.datetime.strptime(res["now"], "%Y-%m-%d %H:%M:%S")
-    bars = "5-minute" if res["interval"] == "5m" else "1-minute"
-    head = "%s  %s %s ET  %s on %s bars (Yahoo, free, can lag)" % (
+    bars = "5 minutos" if res["interval"] == "5m" else "1 minuto"
+    head = "%s  %s %s ET  %s con velas de %s (Yahoo, gratis, puede ir con retraso)" % (
         res["symbol"], when.strftime("%a %Y-%m-%d"), when.strftime("%H:%M"), setup_name(res), bars)
     if res.get("data_time") and res["data_time"] <= res["now"] and res["data_time"][:10] == res["date"]:
-        head += ", data to %s" % res["data_time"][11:]
+        head += ", datos hasta las %s" % res["data_time"][11:]
     out = [head]
     orr = res.get("opening_range")
     if orr:
         start = datetime.datetime.strptime(res["opens"], "%H:%M")
         end = start + datetime.timedelta(minutes=orr["minutes"])
-        out.append("Opening range %s-%s: high $%.2f, low $%.2f (%d of %d bars%s)." % (
+        out.append("Rango de apertura %s-%s: maximo $%.2f, minimo $%.2f (%d de %d velas%s)." % (
             short(start), short(end), orr["high"], orr["low"], orr["bars"], orr["of"],
-            "" if orr["complete"] else ", still forming"))
+            "" if orr["complete"] else ", aun formandose"))
     label = PHASE_LABEL.get(res["phase"]) or LABEL.get(res["status"], res["status"].upper())
     t = res.get("trigger")
     if t:
-        out.append("TRIGGERED %s at $%.2f: the %s bar (bar %d) closed above %s $%.2f (%+.2f%%%s)." % (
+        out.append("ACTIVADA a las %s en $%.2f: la vela de las %s (vela %d) cerro por encima %s $%.2f (%+.2f%%%s)." % (
             t["time"], t["price"], short(datetime.datetime.strptime(t["bar_start"], "%H:%M")), t["bar_index"],
-            "the range high" if res["setup"] == "orb" else "the level", res["level"], t["pct_over"],
-            (", %.2fx the range's volume" % t["volume_x"]) if res.get("min_volume_x") and t.get("volume_x") else ""))
+            "del maximo del rango" if res["setup"] == "orb" else "del nivel", res["level"], t["pct_over"],
+            (", %.2fx el volumen del rango" % t["volume_x"]) if res.get("min_volume_x") and t.get("volume_x") else ""))
         step = INTERVALS[res["interval"]] // 60
         if res.get("minutes_since", 0) > step and res.get("last"):
-            out.append("That was %d minutes ago; the last close is $%.2f (%s bar). A late entry is a different "
-                       "trade: the price, the stop distance and the odds have moved." % (
+            out.append("Hace %d minutos; el ultimo cierre es $%.2f (vela de las %s). Entrar tarde es otra operacion: "
+                       "el precio, la distancia al stop y las probabilidades han cambiado." % (
                            res["minutes_since"], res["last"]["close"], res["last"]["bar_start"]))
         if res.get("data_note"):
             out.append(res["data_note"] + ".")
         if res.get("minutes_since", 0) > step:
-            out.append("Nothing was placed.")
+            out.append("No se ha colocado ninguna orden.")
         else:
-            out.append("This is the moment to get in, if you take the trade. Nothing was placed.")
-        out.append("Next: set the stop and target BEFORE you buy: /trader-exit "
+            out.append("Este es el momento de entrar, si tomas la operacion. No se ha colocado ninguna orden.")
+        out.append("Siguiente paso: fija el stop y el objetivo ANTES de comprar: /trader-exit "
                    "(exit.py plan --from trader/entry.json).")
     else:
         out.append("%s  %s." % (label, res["reason"]))
@@ -633,17 +633,17 @@ def describe(res):
         if res.get("lag_note") and res["status"] == "waiting":
             out.append(res["lag_note"] + ".")
         elif f and res["status"] == "waiting" and res["phase"] in ("open", "forming"):
-            out.append("The %s bar is still forming ($%.2f so far, closes %s); it does not count until it closes." % (
+            out.append("La vela de las %s aun se esta formando ($%.2f hasta ahora, cierra a las %s); no cuenta hasta que cierre." % (
                 f["bar_start"].lstrip("0"), f["price"], f["closes"]))
         if res["status"] == "expired":
-            out.append("No entry on this setup today. Nothing was placed.")
+            out.append("Hoy no hay entrada en esta configuracion. No se ha colocado ninguna orden.")
         if res.get("next_open"):
-            out.append("Next open: %s New York." % res["next_open"])
+            out.append("Proxima apertura: %s hora de Nueva York." % res["next_open"])
     if res.get("early_close"):
-        out.append("Early close today at 1:00 p.m. (%s): no new entries after %s." % (
+        out.append("Cierre anticipado hoy a las 13:00 (%s): no hay entradas nuevas despues de las %s." % (
             res["early_close"], res["no_entries_after"]))
     if not res.get("calendar_known"):
-        out.append("Holiday list covers %s only: check nyse.com for this date." % " and ".join(map(str, CALENDAR_YEARS)))
+        out.append("La lista de festivos cubre solo %s: consulta nyse.com para esta fecha." % " y ".join(map(str, CALENDAR_YEARS)))
     return out
 
 
@@ -656,25 +656,25 @@ def bar_line(b, res):
     n_or = orr.get("of") or 0
     if res["setup"] == "orb" and b["slot"] < n_or:
         seen = [x for x in res["_bars"] if x["slot"] <= b["slot"]]
-        note = "range so far $%.2f to $%.2f" % (min(x["l"] for x in seen), max(x["h"] for x in seen))
+        note = "rango hasta ahora $%.2f a $%.2f" % (min(x["l"] for x in seen), max(x["h"] for x in seen))
         if b["slot"] == n_or - 1:
-            note = "opening range set: high $%.2f, low $%.2f" % (orr["high"], orr["low"])
+            note = "rango de apertura fijado: maximo $%.2f, minimo $%.2f" % (orr["high"], orr["low"])
     elif t and t["bar_index"] == b["slot"]:
-        note = "TRIGGERED: closed above $%.2f (%+.2f%%). Get in now if you take it: %s, $%.2f" % (
+        note = "ACTIVADA: cerro por encima de $%.2f (%+.2f%%). Entra ahora si tomas la operacion: %s, $%.2f" % (
             lvl, t["pct_over"], t["time"], t["price"])
     elif lvl is None:
         note = ""
     elif b["c"] > lvl:
-        note = "above $%.2f" % lvl
+        note = "por encima de $%.2f" % lvl
         if res["setup"] == "level" or b["slot"] >= n_or:
             avg = orr.get("avg_volume")
             if res.get("min_volume_x") and avg:
-                note += ", but volume %.2fx is under %.2fx" % (b["v"] / float(avg), res["min_volume_x"])
+                note += ", pero el volumen %.2fx esta por debajo de %.2fx" % (b["v"] / float(avg), res["min_volume_x"])
             elif b["end"] < datetime.datetime.combine(b["et"].date(), parse_hhmm(res["no_entries_before"], "x")):
-                note += ", but no entries before %s" % res["no_entries_before"]
+                note += ", pero no se entra antes de las %s" % res["no_entries_before"]
     else:
-        note = "$%.2f under $%.2f" % (lvl - b["c"], lvl)
-    return "%5s bar  closed $%.2f  %s" % (start, b["c"], note)
+        note = "$%.2f por debajo de $%.2f" % (lvl - b["c"], lvl)
+    return "%5s vela  cierre $%.2f  %s" % (start, b["c"], note)
 
 
 # ---------------------------------------------------------------- watch
@@ -709,14 +709,14 @@ def watch_loop(provider, clock, sleep, emit, opts, every=30, until=None, max_err
         day = local.date()
         s = session(day)
         if not s:
-            emit("%s: market closed today (%s). Nothing to watch." % (day.isoformat(), trading_day(day)[1]))
+            emit("%s: mercado cerrado hoy (%s). Nada que vigilar." % (day.isoformat(), trading_day(day)[1]))
             return 1, None
         open_dt = datetime.datetime.combine(day, s[0])
         close_dt = datetime.datetime.combine(day, s[1])
         if local < open_dt + datetime.timedelta(seconds=step):
             if not said_preopen:
-                emit("%s ET  %s: watching from the first bar's close at %s." % (
-                    local.strftime("%H:%M"), "not open yet" if local < open_dt else "open, no bar closed yet",
+                emit("%s ET  %s: vigilando desde el cierre de la primera vela, a las %s." % (
+                    local.strftime("%H:%M"), "aun no abre" if local < open_dt else "abierta, sin vela cerrada aun",
                     short(open_dt + datetime.timedelta(seconds=step))))
                 said_preopen = True
             next_fetch = eastern_to_utc(open_dt) + datetime.timedelta(seconds=step + GRACE)
@@ -726,9 +726,9 @@ def watch_loop(provider, clock, sleep, emit, opts, every=30, until=None, max_err
             errors = 0
         except EntryError as e:
             errors += 1
-            emit("%s ET  could not read bars: %s" % (local.strftime("%H:%M:%S"), e))
+            emit("%s ET  no pude leer las velas: %s" % (local.strftime("%H:%M:%S"), e))
             if errors >= max_errors:
-                emit("Stopping after %d failed reads in a row." % errors)
+                emit("Paro tras %d lecturas fallidas seguidas." % errors)
                 return 1, None
             next_fetch = now + datetime.timedelta(seconds=every)
             continue
@@ -738,7 +738,7 @@ def watch_loop(provider, clock, sleep, emit, opts, every=30, until=None, max_err
         fresh = first
         if first:
             emit(lines[0])
-            if len(lines) > 1 and lines[1].startswith("Opening range"):
+            if res.get("opening_range"):
                 emit(lines[1])
             if bars and not res.get("trigger"):
                 emit(bar_line(bars[-1], res))
@@ -751,17 +751,17 @@ def watch_loop(provider, clock, sleep, emit, opts, every=30, until=None, max_err
                     printed = b["slot"]
         if res["status"] == "triggered":
             for line in lines[1:]:
-                if line.startswith("Opening range") or (line.startswith("TRIGGERED") and not fresh):
+                if line.startswith("Rango de apertura") or (line.startswith("ACTIVADA") and not fresh):
                     continue
                 emit(line)
             if on_trigger:
                 on_trigger(res, now)
             return 0, res
         if res["status"] == "expired" or local >= close_dt:
-            emit("EXPIRED  %s." % (res["reason"] or "the market closed without a trigger"))
+            emit("CADUCADA  %s." % (res["reason"] or "el mercado cerro sin activarse"))
             return 1, res
         if until and local >= until:
-            emit("Stopped at --until %s without a trigger. %s." % (short(until), res["reason"]))
+            emit("Paro en --until %s sin activarse. %s." % (short(until), res["reason"]))
             return 1, res
         # sleep until just after the next bar closes; poll every `every` seconds if Yahoo is behind
         cur_slot = int((local - open_dt).total_seconds()) // step
@@ -783,13 +783,13 @@ def watch_loop(provider, clock, sleep, emit, opts, every=30, until=None, max_err
 
 def _opts(a, cfg):
     if a.side in ("sell", "short"):
-        raise EntryError("v2 plans longs only: no short entries. Watch for a buy (--side buy) instead.")
+        raise EntryError("los planes v2 son solo largos: sin entradas cortas. Vigila una compra (--side buy).")
     if a.setup == "orb" and a.level is not None:
-        raise EntryError("--level is for --setup level (an orb's level is its range high)")
+        raise EntryError("--level es para --setup level (el nivel de orb es el maximo de su rango)")
     if a.min_volume_x is not None and a.min_volume_x <= 0:
-        raise EntryError("--min-volume-x must be above 0")
+        raise EntryError("--min-volume-x debe ser mayor que 0")
     if a.level is not None and a.level <= 0:
-        raise EntryError("--level must be a price above 0")
+        raise EntryError("--level debe ser un precio mayor que 0")
     return {"setup": a.setup, "or_minutes": a.or_minutes, "interval": a.interval, "level": a.level,
             "min_volume_x": a.min_volume_x, "cfg": cfg}
 
@@ -818,7 +818,7 @@ def cmd_check(a):
         for line in describe(res):
             print(line)
         if a.write:
-            print("Wrote %s (status %s)." % (a.write, res["status"]))
+            print("Guardado %s (estado %s)." % (a.write, res["status"]))
     return 0 if res["status"] == "triggered" else 1
 
 
@@ -827,7 +827,7 @@ def cmd_watch(a):
     opts = _opts(a, cfg)
     sym = a.symbol.upper()
     if a.every <= 0:
-        raise EntryError("--every must be above 0 seconds")
+        raise EntryError("--every debe ser mayor que 0 segundos")
     start = parse_now(a.now) if a.now else None
     if a.offline or start is not None:
         if start is None:
@@ -848,7 +848,7 @@ def cmd_watch(a):
 
     def on_trigger(res, now):
         write_json(a.out, entry_doc(res, now))
-        print("Wrote %s." % a.out, flush=True)
+        print("Guardado %s." % a.out, flush=True)
 
     def emit(line):
         print(line, flush=True)
@@ -862,17 +862,17 @@ def cmd_watchlist(a):
     cfg = read_config(a.config)
     opts = _opts(a, cfg)
     if not os.path.exists(a.watchlist):
-        raise EntryError("no watchlist at %s: run /trader-scanner first (it writes the hits there)" % a.watchlist)
+        raise EntryError("no hay lista de vigilancia en %s: ejecuta antes /trader-scanner (escribe ahi los candidatos)" % a.watchlist)
     try:
         with open(a.watchlist, encoding="utf-8") as fh:
             doc = json.load(fh)
     except ValueError as e:
-        raise EntryError("%s is not valid JSON: %s" % (a.watchlist, e))
+        raise EntryError("%s no es JSON valido: %s" % (a.watchlist, e))
     hits = [h for h in (doc.get("hits") or []) if isinstance(h, dict) and h.get("symbol")]
     if not hits:
-        raise EntryError("no hits in %s: the scanner found nothing to watch" % a.watchlist)
+        raise EntryError("no hay candidatos en %s: el escaner no encontro nada que vigilar" % a.watchlist)
     if a.offline and not os.path.isdir(a.offline):
-        raise EntryError("watchlist --offline wants a folder of <TICKER>.json files")
+        raise EntryError("watchlist --offline quiere una carpeta con archivos <TICKER>.json")
     now = parse_now(a.now) if a.now else None
     rows = []
     for i, h in enumerate(hits):
@@ -882,7 +882,7 @@ def cmd_watchlist(a):
             o["level"] = h.get("level")
         try:
             if a.setup == "level" and o["level"] is None:
-                raise EntryError("needs a level: --level PRICE or a \"level\" in the watchlist")
+                raise EntryError("necesita un nivel: --level PRECIO o un \"level\" en la lista de vigilancia")
             if i and not a.offline:
                 _sleep(PAUSE)
             chart, when = _load(a, sym, now)
@@ -892,22 +892,22 @@ def cmd_watchlist(a):
     if a.json:
         print(json.dumps([{"symbol": s, "result": public(r) if r else None, "error": e} for s, r, e in rows], indent=2))
     else:
-        print("%-6s  %-9s  %-8s  %-8s  %-9s  %-9s  %s" % ("SYMBOL", "STATUS", "TIME", "PRICE", "LEVEL", "LAST", "VS LEVEL"))
+        print("%-6s  %-9s  %-8s  %-8s  %-9s  %-9s  %s" % ("VALOR", "ESTADO", "HORA", "PRECIO", "NIVEL", "ULTIMO", "VS NIVEL"))
         for s, r, e in rows:
             if e:
                 print("%-6s  error: %s" % (s, e))
                 continue
             t = r.get("trigger") or {}
             last = r.get("last") or {}
-            status = SHORT.get(r["phase"], r["status"]) if r["status"] != "triggered" else "triggered"
+            status = SHORT.get(r["phase"], r["status"]) if r["status"] != "triggered" else "activada"
             print("%-6s  %-9s  %-8s  %-8s  %-9s  %-9s  %s" % (
                 s, status[:9], t.get("time") or "-", ("$%.2f" % t["price"]) if t else "-",
                 ("$%.2f" % r["level"]) if r.get("level") is not None else "-",
                 ("$%.2f" % last["close"]) if last else "-",
                 ("%+.2f%%" % last["vs_level_pct"]) if last.get("vs_level_pct") is not None else "-"))
         n = sum(1 for _, r, _ in rows if r and r["status"] == "triggered")
-        print("%d of %d triggered. Pick one, then: entry.py check <TICKER> --write, and /trader-exit." % (n, len(rows)))
-        print("Free Yahoo bars, unofficial and can lag. Nothing was placed.")
+        print("%d de %d activadas. Elige una y despues: entry.py check <TICKER> --write, y /trader-exit." % (n, len(rows)))
+        print("Velas de Yahoo gratuitas, no oficiales y que pueden ir con retraso. No se ha colocado ninguna orden.")
     return 0 if any(r and r["status"] == "triggered" for _, r, _ in rows) else 1
 
 

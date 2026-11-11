@@ -139,7 +139,7 @@ def parse_now(text):
     try:
         dt = datetime.datetime.fromisoformat(t)
     except ValueError:
-        raise AlertError("--now wants a time like \"2026-10-19 10:15\" (New York) or ...Z (UTC)")
+        raise AlertError("--now quiere una hora como \"2026-10-19 10:15\" (Nueva York) o ...Z (UTC)")
     if dt.tzinfo is None:
         return eastern_to_utc(dt)
     return (dt - dt.utcoffset()).replace(tzinfo=None)
@@ -205,11 +205,11 @@ def parse_stooq(text, sym):
     """Symbol,Date,Time,Open,High,Low,Close,Volume -> quote. N/D means no data."""
     rows = list(csv.DictReader(io.StringIO(text.strip())))
     if not rows:
-        raise AlertError("Stooq returned no rows for %s" % sym)
+        raise AlertError("Stooq no devolvio datos para %s" % sym)
     r = {k.strip().lower(): (v or "").strip() for k, v in rows[0].items() if k}
     close = r.get("close", "")
     if not close or close.upper() == "N/D":
-        raise AlertError("Stooq has no data for %s (check the ticker)" % sym)
+        raise AlertError("Stooq no tiene datos para %s (revisa el ticker)" % sym)
 
     def f(k):
         v = r.get(k, "")
@@ -227,14 +227,14 @@ def parse_yahoo(text, sym):
         data = json.loads(text)
         res = data["chart"]["result"]
     except (ValueError, KeyError, TypeError):
-        raise AlertError("Yahoo returned something unexpected for %s" % sym)
+        raise AlertError("Yahoo devolvio una respuesta inesperada para %s" % sym)
     if not res:
         err = (data.get("chart") or {}).get("error") or {}
-        raise AlertError("Yahoo has no data for %s: %s" % (sym, err.get("description", "unknown ticker")))
+        raise AlertError("Yahoo no tiene datos para %s: %s" % (sym, err.get("description", "ticker desconocido")))
     m = res[0].get("meta", {})
     price = m.get("regularMarketPrice")
     if price is None:
-        raise AlertError("Yahoo has no price for %s" % sym)
+        raise AlertError("Yahoo no tiene precio para %s" % sym)
     t = m.get("regularMarketTime")
     when = (datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             if t else "")
@@ -268,13 +268,13 @@ def _get(url, timeout=20):
                 pass
         return e.code, body
     except urllib.error.URLError as e:
-        raise AlertError("could not reach %s: %s" % (url.split("/")[2], e.reason))
+        raise AlertError("no pude conectar con %s: %s" % (url.split("/")[2], e.reason))
 
 
 def fetch(url, timeout=20):
     code, text = _get(url, timeout)
     if code != 200:
-        raise AlertError("%s answered HTTP %d" % (url.split("?")[0], code))
+        raise AlertError("%s respondio HTTP %d" % (url.split("?")[0], code))
     return text
 
 
@@ -295,7 +295,7 @@ def fetch_yahoo(sym, timeout=20):
         last = (url, code)
         if code != 429 and code < 500:
             break
-    raise AlertError("%s answered HTTP %d" % (last[0].split("?")[0], last[1]))
+    raise AlertError("%s respondio HTTP %d" % (last[0].split("?")[0], last[1]))
 
 
 def _offline_text(folder, source, sym):
@@ -307,7 +307,7 @@ def _offline_text(folder, source, sym):
     if os.path.exists(base + ".gz"):
         with gzip.open(base + ".gz", "rt", encoding="utf-8") as fh:
             return fh.read()
-    raise AlertError("no offline quote file %s" % base)
+    raise AlertError("no hay archivo de cotizaciones sin conexion %s" % base)
 
 
 def get_quotes(symbols, source="yahoo", offline=None, pause=PAUSE):
@@ -369,7 +369,7 @@ def _read(path, default):
         with open(path, encoding="utf-8") as fh:
             return json.load(fh)
     except ValueError as e:
-        raise AlertError("%s is not valid JSON: %s" % (path, e))
+        raise AlertError("%s no es JSON valido: %s" % (path, e))
 
 
 # ---------------------------------------------------------------- rules
@@ -388,17 +388,17 @@ def _hhmm(text):
 def validate(rule):
     t = rule.get("type")
     if t not in PRICE_TYPES:
-        raise AlertError("rule %s: unknown type %r" % (rule.get("id"), t))
+        raise AlertError("regla %s: tipo desconocido %r" % (rule.get("id"), t))
     if t not in NO_QUOTE and not rule.get("symbol"):
-        raise AlertError("rule %s needs a symbol" % rule.get("id"))
+        raise AlertError("la regla %s necesita un simbolo" % rule.get("id"))
     if t in ("above", "below", "stop", "target") and not isinstance(rule.get("price"), (int, float)):
-        raise AlertError("rule %s needs a numeric price" % rule.get("id"))
+        raise AlertError("la regla %s necesita un precio numerico" % rule.get("id"))
     if t == "pct_move" and not isinstance(rule.get("pct"), (int, float)):
-        raise AlertError("rule %s needs a numeric pct" % rule.get("id"))
+        raise AlertError("la regla %s necesita un porcentaje numerico" % rule.get("id"))
     if t == "time" and _hhmm(rule.get("at")) is None:
-        raise AlertError("rule %s needs \"at\" as a New York time like \"15:55\"" % rule.get("id"))
+        raise AlertError("la regla %s necesita \"at\" como hora de Nueva York, por ejemplo \"15:55\"" % rule.get("id"))
     if rule.get("date") and not re.match(r"^\d{4}-\d{2}-\d{2}$", str(rule["date"])):
-        raise AlertError("rule %s: date must be YYYY-MM-DD" % rule.get("id"))
+        raise AlertError("regla %s: la fecha debe ser AAAA-MM-DD" % rule.get("id"))
 
 
 def active(rule, today):
@@ -441,23 +441,23 @@ def evaluate(rules, quotes, status, state, now_utc):
         typ = {"stop": "below", "target": "above"}.get(r["type"], r["type"])
         if typ == "opening_bell":
             if status["open"] and not _rang_today(rung.get(rid), today):
-                rings.append({"id": rid, "symbol": "", "message": "Opening bell: the NYSE is open (%s New York)%s."
-                              % (status["now_new_york"], (", early close at 1:00 p.m. today, "
+                rings.append({"id": rid, "symbol": "", "message": "Campana de apertura: la NYSE esta abierta (%s Nueva York)%s."
+                              % (status["now_new_york"], (", cierre anticipado hoy a las 13:00, "
                                                           + status["early_close"]) if status.get("early_close") else "")})
                 rung[rid] = stamp
             continue
         if typ == "time":
             at = ring_time(r, status)
             if status.get("opens") and local.time() >= at and not _rang_today(rung.get(rid), today):
-                label = r.get("label") or "time alert"
-                msg = "%s%s: it is %s New York (set for %s)" % (label[:1].upper(), label[1:],
+                label = r.get("label") or "alerta de hora"
+                msg = "%s%s: son las %s en Nueva York (fijada para %s)" % (label[:1].upper(), label[1:],
                                                                  local.strftime("%H:%M"), at.strftime("%H:%M"))
-                msg += (", the market closes at %s." % status["closes"]) if status["open"] else \
-                    ", the market has closed."
+                msg += (", el mercado cierra a las %s." % status["closes"]) if status["open"] else \
+                    ", el mercado ya ha cerrado."
                 sym = str(r.get("symbol") or "").upper()
                 if sym:
-                    msg += (" If %s is still open, close it: trader-broker flatten --symbol %s builds the sell "
-                            "ticket, then trader-risk and your yes." % (sym, sym))
+                    msg += (" Si %s sigue abierta, ciérrala: trader-broker flatten --symbol %s prepara la orden de venta; "
+                            "después trader-risk y tu confirmación." % (sym, sym))
                 rings.append({"id": rid, "symbol": sym, "message": msg})
                 rung[rid] = stamp
             continue
@@ -469,10 +469,10 @@ def evaluate(rules, quotes, status, state, now_utc):
         if typ in ("above", "below"):
             hit = p >= r["price"] if typ == "above" else p <= r["price"]
             if hit and rid not in rung:
-                word = "at or above" if typ == "above" else "at or below"
-                label = {"stop": "stop", "target": "target"}.get(r["type"], "alert level")
-                rings.append({"id": rid, "symbol": sym, "message": "%s %s $%.2f: %s your %s $%s%s."
-                              % (sym, "is" if status["open"] else "last", p, word, label, _n(r["price"]),
+                word = "en o por encima de" if typ == "above" else "en o por debajo de"
+                label = {"stop": "stop", "target": "objetivo"}.get(r["type"], "nivel de alerta")
+                rings.append({"id": rid, "symbol": sym, "message": "%s %s $%.2f: %s tu %s $%s%s."
+                              % (sym, "esta en" if status["open"] else "ultimo", p, word, label, _n(r["price"]),
                                  (" (" + r["note"] + ")") if r.get("note") else "")})
                 rung[rid] = stamp
             elif not hit and rid in rung and r.get("rearm"):
@@ -485,7 +485,7 @@ def evaluate(rules, quotes, status, state, now_utc):
             want = r.get("direction")
             hit = abs(move) >= r["pct"] and (not want or (want == "up") == (move > 0))
             if hit and not _rang_today(rung.get(rid), today):
-                rings.append({"id": rid, "symbol": sym, "message": "%s moved %+.2f%% to $%.2f (from $%.2f)."
+                rings.append({"id": rid, "symbol": sym, "message": "%s se movio %+.2f%% hasta $%.2f (desde $%.2f)."
                               % (sym, move, p, float(ref))})
                 rung[rid] = stamp
     state["last_check"] = stamp
@@ -500,21 +500,21 @@ def _n(x):
 def rules_from_plan(plan, cfg_flat_by=None):
     """trader/plan.json -> a stop alert, a target alert and a flat-by-close time alert, for the plan's day."""
     if not isinstance(plan, dict) or not plan.get("symbol"):
-        raise AlertError("the plan has no symbol (run trader-exit first)")
+        raise AlertError("el plan no tiene simbolo (ejecuta antes trader-exit)")
     sym = str(plan["symbol"]).upper()
     out = []
-    for key, typ, word in (("stop", "stop", "plan stop"), ("target", "target", "plan target")):
+    for key, typ, word in (("stop", "stop", "stop del plan"), ("target", "target", "objetivo del plan")):
         v = plan.get(key)
         if not isinstance(v, (int, float)) or v <= 0:
-            raise AlertError("the plan has no %s (run trader-exit)" % key)
+            raise AlertError("el plan no tiene %s (ejecuta trader-exit)" % key)
         label = plan.get("%s_label" % key)
         out.append({"id": "%s-plan-%s" % (sym.lower(), key), "symbol": sym, "type": typ, "price": float(v),
                     "note": word + (": " + label if label else "")})
     flat = plan.get("flat_by") or cfg_flat_by or "15:55"
     if _hhmm(flat) is None:
-        raise AlertError("the plan's flat_by %r is not a time like 15:55" % flat)
+        raise AlertError("el flat_by del plan %r no es una hora como 15:55" % flat)
     out.append({"id": "%s-flat-by" % sym.lower(), "symbol": sym, "type": "time", "at": flat,
-                "label": "flat by close", "before_close": True})
+                "label": "salir antes del cierre", "before_close": True})
     if plan.get("date"):
         for r in out:
             r["date"] = str(plan["date"])
@@ -547,22 +547,22 @@ def cmd_clock(a):
     if a.json:
         print(json.dumps(st, indent=2))
     else:
-        print("New York %s (%s): NYSE %s, %s." % (st["now_new_york"], st["weekday"],
-                                                  "OPEN" if st["open"] else "closed", st["reason"]))
+        print("Nueva York %s (%s): NYSE %s, %s." % (st["now_new_york"], st["weekday"],
+                                                  "ABIERTA" if st["open"] else "cerrada", st["reason"]))
         if st.get("opens"):
-            print("Today's session: %s to %s%s." % (st["opens"], st["closes"],
-                                                    (" (early close: %s)" % st["early_close"]) if st.get("early_close") else ""))
+            print("Sesion de hoy: de %s a %s%s." % (st["opens"], st["closes"],
+                                                    (" (cierre anticipado: %s)" % st["early_close"]) if st.get("early_close") else ""))
         if not st["open"] and st.get("next_open"):
-            print("Next open: %s New York." % st["next_open"])
+            print("Proxima apertura: %s hora de Nueva York." % st["next_open"])
         if not st["calendar_known"]:
-            print("Holiday list covers %s only: check nyse.com for this date." % " and ".join(map(str, CALENDAR_YEARS)))
+            print("La lista de festivos cubre solo %s: consulta nyse.com para esta fecha." % " y ".join(map(str, CALENDAR_YEARS)))
     return 0 if st["open"] else 1
 
 
 def cmd_quote(a):
     syms = _dedupe([s.upper() for s in a.symbols] + (holdings(a) if a.holdings else []))
     if not syms:
-        raise AlertError("which tickers? alerts.py quote TSLA KO, or --holdings")
+        raise AlertError("¿que tickers? alerts.py quote TSLA KO, o --holdings")
     now = parse_now(a.now)
     quotes, errors = get_quotes(syms, a.source, a.offline)
     if a.write and quotes:
@@ -575,20 +575,20 @@ def cmd_quote(a):
             if q:
                 chg = ""
                 if q.get("prev_close"):
-                    chg = " (%+.2f%% vs prev close $%.2f)" % (100.0 * (q["price"] / q["prev_close"] - 1), q["prev_close"])
+                    chg = " (%+.2f%% frente al cierre anterior $%.2f)" % (100.0 * (q["price"] / q["prev_close"] - 1), q["prev_close"])
                 print("%-6s $%.2f%s  %s  [%s]" % (s, q["price"], chg, q.get("time", ""), q["source"]))
         for e in errors:
             print("error: " + e)
         if a.write and quotes:
-            print("Wrote %d price(s) to %s." % (len(quotes), a.write))
-        print("Quotes are free, delayed and unofficial: for alerts only. Your broker's price is the one that fills.")
+            print("Guardado(s) %d precio(s) en %s." % (len(quotes), a.write))
+        print("Las cotizaciones son gratuitas, con retraso y no oficiales: solo para alertas. Vale el precio de tu broker.")
     return 0 if quotes else 1
 
 
 def cmd_check(a):
     doc = _read(a.rules, None)
     if not doc or not doc.get("rules"):
-        raise AlertError("no rules in %s: add some with alerts.py add --from-plan" % a.rules)
+        raise AlertError("no hay reglas en %s: añade alguna con alerts.py add --from-plan" % a.rules)
     rules = doc["rules"]
     now = parse_now(a.now)
     status = market_status(now)
@@ -605,20 +605,20 @@ def cmd_check(a):
         print(json.dumps({"market": status, "rings": rings, "errors": errors,
                           "quotes": {s: q["price"] for s, q in quotes.items()}}, indent=2))
     else:
-        print("NYSE %s (%s New York, %s)." % ("OPEN" if status["open"] else "closed", status["now_new_york"],
+        print("NYSE %s (%s Nueva York, %s)." % ("ABIERTA" if status["open"] else "cerrada", status["now_new_york"],
                                               status["reason"]))
         for r in rings:
             print("ALERT " + r["message"])
         if not rings:
-            print("Nothing hit. %d rule(s) watched today%s." % (
+            print("Ninguna se ha cumplido. %d regla(s) vigilada(s) hoy%s." % (
                 len(watched), (", " + ", ".join("%s $%.2f" % (s, quotes[s]["price"]) for s in syms if s in quotes))
                 if quotes else ""))
         for e in errors:
             print("error: " + e)
         if rings:
-            print("An alert is information, not an order. A bracket's stop-loss and take-profit already sit at "
-                  "the broker: check get_open_position and record any fill (ticket.py fill). To close a "
-                  "position yourself: ticket.py flatten, then trader-risk and your yes.")
+            print("Una alerta es informacion, no una orden. El stop y el objetivo de la orden bracket ya estan en el broker: "
+                  "el broker: revisa get_open_position y registra cualquier ejecucion (ticket.py fill). Para cerrar una "
+                  "posicion tu mismo: ticket.py flatten, despues trader-risk y tu confirmacion.")
     return 0 if rings else 1
 
 
@@ -628,7 +628,7 @@ def cmd_add(a):
     if a.from_plan:
         plan = _read(a.plan, None)
         if plan is None:
-            raise AlertError("no plan at %s (run trader-exit first)" % a.plan)
+            raise AlertError("no hay plan en %s (ejecuta antes trader-exit)" % a.plan)
         cfg = _read(a.config, {}) if a.config else {}
         new = rules_from_plan(plan, (cfg or {}).get("flat_by"))
         ids = {r["id"] for r in new}
@@ -640,15 +640,15 @@ def cmd_add(a):
             _write(a.state, state)
         _write(a.rules, doc)
         for r in new:
-            print("Added %s: %s" % (r["id"], json.dumps(r)))
-        print("Run alerts.py check every few minutes while the trade is open (a scheduled task or /loop). "
-              "Free quotes are delayed; the broker's bracket orders are what actually stop you out.")
+            print("Añadida %s: %s" % (r["id"], json.dumps(r)))
+        print("Ejecuta alerts.py check cada pocos minutos mientras la operacion este abierta. "
+              "Las cotizaciones gratuitas van con retraso; lo que de verdad te saca de la operacion son las ordenes bracket del broker.")
         return 0
     if a.opening_bell:
         rule = {"id": a.id or "opening-bell", "type": "opening_bell"}
     elif a.at:
         if _hhmm(a.at) is None:
-            raise AlertError("--at wants a New York time like 15:55")
+            raise AlertError("--at quiere una hora de Nueva York como 15:55")
         rule = {"id": a.id or ("time-%s" % a.at.replace(":", "")), "type": "time", "at": a.at,
                 "label": a.label or "time alert"}
         if a.symbol:
@@ -657,7 +657,7 @@ def cmd_add(a):
             rule["before_close"] = True
     else:
         if not a.symbol:
-            raise AlertError("--symbol is required (or --from-plan, --at, --opening-bell)")
+            raise AlertError("--symbol es obligatorio (o --from-plan, --at, --opening-bell)")
         sym = a.symbol.upper()
         if a.above is not None:
             rule = {"type": "above", "price": a.above}
@@ -672,7 +672,7 @@ def cmd_add(a):
             if a.direction:
                 rule["direction"] = a.direction
         else:
-            raise AlertError("give one of --above, --below, --stop, --target or --pct")
+            raise AlertError("indica uno de --above, --below, --stop, --target o --pct")
         val = rule.get("price", rule.get("pct"))
         rule = dict({"id": a.id or ("%s-%s-%s" % (sym.lower(), rule["type"], _n(val)))}, symbol=sym, **rule)
         if a.rearm:
@@ -683,10 +683,10 @@ def cmd_add(a):
         rule["date"] = a.date
     validate(rule)
     if any(r.get("id") == rule["id"] for r in doc["rules"]):
-        raise AlertError("a rule with id %s already exists" % rule["id"])
+        raise AlertError("ya existe una regla con id %s" % rule["id"])
     doc["rules"].append(rule)
     _write(a.rules, doc)
-    print("Added %s: %s" % (rule["id"], json.dumps(rule)))
+    print("Añadida %s: %s" % (rule["id"], json.dumps(rule)))
     return 0
 
 
@@ -694,7 +694,7 @@ def cmd_list(a):
     doc = _read(a.rules, {"rules": []})
     state = _read(a.state, {})
     if not doc.get("rules"):
-        print("No rules yet.")
+        print("Todavia no hay reglas.")
         return 1
     for r in doc["rules"]:
         rid = r.get("id")
@@ -707,11 +707,11 @@ def cmd_list(a):
 def cmd_reset(a):
     state = _read(a.state, {})
     if a.id not in state.get("rung", {}):
-        print("%s has not rung (nothing to reset)." % a.id)
+        print("%s no ha saltado (nada que reiniciar)." % a.id)
         return 1
     del state["rung"][a.id]
     _write(a.state, state)
-    print("Re-armed %s." % a.id)
+    print("Reactivada %s." % a.id)
     return 0
 
 

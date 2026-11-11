@@ -57,21 +57,24 @@ CHART = "https://%s.finance.yahoo.com/v8/finance/chart/%s?range=1d&interval=5m"
 SEC_FEED = ("https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=%s&type=%s"
             "&dateb=&owner=include&count=%d&output=atom")
 TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
+TAGS_ES = {"earnings": "resultados", "analyst": "analistas", "legal": "legal", "deal": "operacion",
+           "capital": "capital", "people": "directivos", "risk": "riesgo", "halt": "suspension",
+           "regulatory": "regulatorio", "macro": "macro"}
 PLACEHOLDER = "you@example.com"
 BROWSER_UA = "Mozilla/5.0 (compatible; day-trader-skill/2.0; +https://github.com/Jakeschincariol/day-trader-skill)"
 KEEP_DAYS = 30
 MOVE_PCT = 3.0  # a stock this far from yesterday's close is flagged as moving
 
 ITEMS_8K = {
-    "1.01": "material agreement", "1.02": "agreement ended", "1.03": "bankruptcy",
-    "1.05": "cybersecurity incident", "2.01": "acquisition or sale of assets",
-    "2.02": "earnings results", "2.03": "new debt", "2.04": "debt acceleration",
-    "2.05": "restructuring costs", "2.06": "impairment", "3.01": "delisting notice",
-    "3.02": "unregistered share sale", "3.03": "shareholder rights change",
-    "4.01": "auditor change", "4.02": "past financials no longer reliable",
-    "5.01": "change in control", "5.02": "director or officer change",
-    "5.03": "bylaws or fiscal year change", "5.07": "shareholder vote results",
-    "7.01": "Regulation FD disclosure", "8.01": "other events", "9.01": "exhibits",
+    "1.01": "acuerdo importante", "1.02": "fin de un acuerdo", "1.03": "quiebra",
+    "1.05": "incidente de ciberseguridad", "2.01": "compra o venta de activos",
+    "2.02": "resultados", "2.03": "nueva deuda", "2.04": "aceleracion de deuda",
+    "2.05": "costes de reestructuracion", "2.06": "deterioro", "3.01": "aviso de exclusion de cotizacion",
+    "3.02": "venta de acciones no registrada", "3.03": "cambio en los derechos de accionistas",
+    "4.01": "cambio de auditor", "4.02": "cuentas pasadas que ya no son fiables",
+    "5.01": "cambio de control", "5.02": "cambio de consejero o directivo",
+    "5.03": "cambio de estatutos o de ejercicio fiscal", "5.07": "resultados de la votacion de accionistas",
+    "7.01": "informacion Reg. FD", "8.01": "otros hechos", "9.01": "anexos",
 }
 IMPORTANT_ITEMS = {"1.03", "1.05", "2.02", "2.04", "2.06", "3.01", "4.02", "5.01", "5.02"}
 KEYWORDS = [
@@ -168,7 +171,7 @@ class Fetcher(object):
         if self.offline:
             path = os.path.join(self.offline, name)
             if not os.path.isfile(path):
-                raise NewsError("offline: no file %s" % path)
+                raise NewsError("sin conexion: no hay archivo %s" % path)
             with open(path, "rb") as fh:
                 return fh.read()
         if sec and not self.sec_ua:
@@ -186,9 +189,9 @@ class Fetcher(object):
                     data = gzip.decompress(data)
                 return data
         except urllib.error.HTTPError as exc:
-            raise NewsError("HTTP %s for %s" % (exc.code, url))
+            raise NewsError("HTTP %s para %s" % (exc.code, url))
         except urllib.error.URLError as exc:
-            raise NewsError("could not reach %s: %s" % (url, exc.reason))
+            raise NewsError("no pude conectar con %s: %s" % (url, exc.reason))
 
 
 def yahoo_symbol(ticker):
@@ -243,7 +246,7 @@ def parse_rss(data, ticker):
     try:
         root = ET.fromstring(data)
     except ET.ParseError as exc:
-        raise NewsError("RSS for %s is not valid XML: %s" % (ticker, exc))
+        raise NewsError("el RSS de %s no es XML valido: %s" % (ticker, exc))
     out = []
     for it in root.iter("item"):
         title = _text(it, "title")
@@ -260,7 +263,7 @@ def parse_sec_atom(data, ticker):
     try:
         root = ET.fromstring(data)
     except ET.ParseError as exc:
-        raise NewsError("SEC feed for %s is not valid XML: %s" % (ticker, exc))
+        raise NewsError("el feed de la SEC de %s no es XML valido: %s" % (ticker, exc))
     company = ""
     for el in root.iter():
         if _local(el.tag) == "conformed-name":
@@ -273,12 +276,12 @@ def parse_sec_atom(data, ticker):
         form = _text(entry, "filing-type")
         acc = _text(entry, "accession-number")
         items = re.findall(r"\d+\.\d+", _text(entry, "items-desc"))
-        labels = [ITEMS_8K.get(i, "item " + i) for i in items if i != "9.01"]
+        labels = [ITEMS_8K.get(i, "punto " + i) for i in items if i != "9.01"]
         link = ""
         for c in entry.iter():
             if _local(c.tag) == "link":
                 link = c.get("href", "")
-        title = "%s filed a %s" % (company or ticker, form)
+        title = "%s presento un %s" % (company or ticker, form)
         if labels:
             title += ": " + ", ".join(labels)
         out.append({"id": "sec:" + acc, "source": "SEC EDGAR", "kind": "filing", "form": form,
@@ -294,11 +297,11 @@ def parse_chart(data, ticker):
         doc = json.loads(data.decode("utf-8") if isinstance(data, bytes) else data)
         meta = doc["chart"]["result"][0]["meta"]
     except (ValueError, KeyError, IndexError, TypeError):
-        raise NewsError("chart for %s is not usable" % ticker)
+        raise NewsError("el grafico de %s no sirve" % ticker)
     price = meta.get("regularMarketPrice")
     prev = meta.get("chartPreviousClose") or meta.get("previousClose")
     if not price or not prev:
-        raise NewsError("chart for %s has no price" % ticker)
+        raise NewsError("el grafico de %s no tiene precio" % ticker)
     when = meta.get("regularMarketTime")
     return {"ticker": ticker, "price": round(float(price), 2), "prev_close": round(float(prev), 2),
             "pct": round((float(price) / float(prev) - 1) * 100, 2),
@@ -320,7 +323,7 @@ def collect_moves(fetcher, watch, errors=None):
             out.append(parse_chart(data, t))
         except NewsError as exc:
             if not (fetcher.offline and "no file" in str(exc)):
-                errors.append("price for %s: %s" % (t, exc))
+                errors.append("precio de %s: %s" % (t, exc))
     return out
 
 
@@ -385,12 +388,12 @@ def collect(fetcher, watch, state, sec=True, forms=("8-K",), count=10, errors=No
         try:
             items += parse_rss(fetcher.get(YAHOO % yahoo_symbol(t), "yahoo-%s.xml" % t), t)
         except NewsError as exc:
-            errors.append("headlines for %s: %s" % (t, exc))
+            errors.append("titulares de %s: %s" % (t, exc))
     if sec:
         try:
             ciks = cik_map(fetcher, state)
         except NewsError as exc:
-            errors.append("SEC ticker list: %s" % exc)
+            errors.append("lista de tickers de la SEC: %s" % exc)
             ciks = {}
         for t in sorted(watch):
             cik = ciks.get(t)
@@ -404,7 +407,7 @@ def collect(fetcher, watch, state, sec=True, forms=("8-K",), count=10, errors=No
                                        "sec-%s-%s.xml" % (form, cik), sec=True)
                     items += parse_sec_atom(data, t)
                 except NewsError as exc:
-                    errors.append("SEC %s for %s: %s" % (form, t, exc))
+                    errors.append("SEC %s de %s: %s" % (form, t, exc))
     return items
 
 
@@ -438,9 +441,9 @@ def remember(items, state, now):
 def render_moves(moves, move_pct=MOVE_PCT):
     out = []
     for m in moves:
-        flag = "MOVING" if abs(m["pct"]) >= move_pct else ""
+        flag = "SE MUEVE" if abs(m["pct"]) >= move_pct else ""
         when = (" at %s ET" % to_eastern(m["time"]).strftime("%H:%M")) if m.get("time") else ""
-        out.append("%-6s %s %+.2f%% vs yesterday's close %s%s  %s" % (
+        out.append("%-6s %s %+.2f%% frente al cierre de ayer %s%s  %s" % (
             m["ticker"], "{:,.2f}".format(m["price"]), m["pct"], "{:,.2f}".format(m["prev_close"]),
             when, flag))
     return out
@@ -451,21 +454,21 @@ def render(items, errors, now, moves=None, move_pct=MOVE_PCT):
     if out:
         out.append("")
     if not items:
-        out.append("Nothing new.")
+        out.append("Nada nuevo.")
     for it in items:
-        when = to_eastern(it["time"]).strftime("%Y-%m-%d %H:%M ET") if it["time"] else "time unknown"
+        when = to_eastern(it["time"]).strftime("%Y-%m-%d %H:%M ET") if it["time"] else "hora desconocida"
         mark = "!" if it.get("important") else " "
         who = ",".join(it["touches"]) or it["ticker"]
         out.append("%s %s  %-11s %-13s %s" % (mark, when, who, it["source"], it["title"]))
         extra = []
         if it["tags"]:
-            extra.append("tags: " + ", ".join(it["tags"]))
+            extra.append("etiquetas: " + ", ".join(TAGS_ES.get(t, t) for t in it["tags"]))
         extra.append(it["link"])
         out.append("      " + "  ".join(extra))
     for e in errors:
-        out.append("note: %s" % e)
-    out.append("Checked %s. Headlines are leads, not facts; open the story before acting. "
-               "Not financial advice." % to_eastern(now).strftime("%Y-%m-%d %H:%M ET"))
+        out.append("aviso: %s" % e)
+    out.append("Revisado %s. Los titulares son pistas, no hechos; abre la noticia antes de actuar. "
+               "No es asesoramiento financiero." % to_eastern(now).strftime("%Y-%m-%d %H:%M ET"))
     return "\n".join(out) + "\n"
 
 
@@ -506,7 +509,7 @@ def main(argv=None):
     else:
         watch = watch_from_files(args.portfolio, args.watchlist, args.plan)
     if not watch:
-        print("news: no tickers. Pass --tickers, or run /trader-scanner first (it writes "
+        print("news: no hay tickers. Indica --tickers, o ejecuta antes /trader-scanner (escribe "
               "trader/watchlist.json).", file=sys.stderr)
         return 2
     now = parse_time(args.now) if args.now else _dt.datetime.now(_dt.timezone.utc)
@@ -515,8 +518,8 @@ def main(argv=None):
     ua = sec_user_agent(args.user_agent, args.config)
     sec = not args.no_sec
     if sec and not ua and not args.offline:
-        errors.append("SEC filings skipped: set sec_user_agent in trader/config.json or "
-                      "SEC_USER_AGENT (\"Your Name you@example.com\") to include them")
+        errors.append("filings de la SEC omitidos: define sec_user_agent en trader/config.json o "
+                      "SEC_USER_AGENT (\"Tu Nombre tu@ejemplo.com\") para incluirlos")
         sec = False
     fetcher = Fetcher(ua, offline=args.offline)
     forms = [f.strip().upper() for f in args.forms.split(",") if f.strip()]

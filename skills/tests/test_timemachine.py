@@ -26,8 +26,8 @@ NOW_UTC = tm.parse_now(NOW)
 PLAN = {"created_by": "trader-exit", "symbol": "TSLA", "side": "buy", "date": "2026-10-19", "setup": "orb",
         "entry": 364.18, "entry_time": "10:15 AM", "entry_bar": 8, "interval": "5m",
         "opening_range": {"high": 362.18, "low": 354.47, "minutes": 15},
-        "stop": 358.32, "stop_rule": "or_mid", "stop_label": "opening-range midpoint",
-        "target": 370.04, "target_r": 1.0, "target_label": "1R (one times the risk)",
+        "stop": 358.32, "stop_rule": "or_mid", "stop_label": "punto medio del rango de apertura",
+        "target": 370.04, "target_r": 1.0, "target_label": "1R (1 veces el riesgo)",
         "risk_per_share": 5.86, "reward_risk": 1.0, "flat_by": "15:55"}
 
 # fingerprints of the reel's refs/sim-out.json (sim.py mid 1, seed 19): proves bit-for-bit equality
@@ -122,12 +122,12 @@ class Reel(unittest.TestCase):
                          ("2026-07-28", 307.97, 304.89, 311.05, "target"))
 
     def test_the_verdict_says_coin_flip(self):
-        self.assertEqual(self.doc["verdict"], "Close to a coin flip: target first 29.4 % vs stop first 25.5 %.")
+        self.assertEqual(self.doc["verdict"], "Practicamente a cara o cruz: objetivo primero 29.4 % frente a stop primero 25.5 %.")
         # 1R breaks even at 50 % of the replays that hit one side; the reel's target got 53.6 %
         gap, share, even = tm.lean(self.doc["mc"])
         self.assertEqual((round(share, 3), even), (0.536, 0.5))
         self.assertEqual(self.doc["verdict_notes"],
-                         ["45.1 % of the replays hit neither by 4:00 PM; the price at 4:00 PM decides those."])
+                         ["El 45.1 % de las repeticiones no toca ninguno antes de las 4:00 PM; el precio a las 4:00 PM decide esas."])
 
     def test_bands_start_at_the_entry(self):
         m = self.doc["mc"]
@@ -145,13 +145,12 @@ class Reel(unittest.TestCase):
 
     def test_the_text_report(self):
         text = "\n".join(tm.report(self.doc))
-        for line in ("TSLA buy, Monday 2026-10-19: entry 364.18 at 10:15 AM (bar 8), stop 358.32, target 370.04",
-                     "10,000 replays", "69 five-minute bars", "seed 19", "59 full sessions",
-                     "target first   29.4 %", "stop first     25.5 %", "neither        45.1 %   still open at 4:00 PM",
-                     "green          51.7 %", "median 364.36, 90 % of replays between 355.54 and 373.54",
-                     "Average R: +0.034", "fired 33 times: 13 target, 15 stop, 5 neither. Average R -0.062",
-                     "Close to a coin flip: target first 29.4 % vs stop first 25.5 %.\n45.1 % of the replays "
-                     "hit neither by 4:00 PM; the price at 4:00 PM decides those.", "not a prediction", "--seed 19"):
+        for line in ("TSLA buy, lunes 2026-10-19: entrada 364.18 a las 10:15 AM (vela 8), stop 358.32, objetivo 370.04",
+                     "10,000 repeticiones", "69 velas de cinco minutos", "seed 19", "59 sesiones completas",
+                     "objetivo primero  29.4 %", "stop primero      25.5 %", "ninguno        45.1 %   sigue abierta a las 4:00 PM",
+                     "verde          51.7 %", "mediana 364.36, el 90 % de las repeticiones entre 355.54 y 373.54",
+                     "R media: +0.034", "se activo 33 veces: 13 objetivo, 15 stop, 5 ninguno. R media -0.062",
+                     "Practicamente a cara o cruz: objetivo primero 29.4 % frente a stop primero 25.5 %.\nEl 45.1 % de las repeticiones no toca ninguno antes de las 4:00 PM; el precio a las 4:00 PM decide esas.", "No es una prediccion", "--seed 19"):
             self.assertIn(line, text)
         for word in ("profit", "P&L", "guarantee", "real time", "tick by tick"):
             self.assertNotIn(word, text)
@@ -206,8 +205,8 @@ class Bars(unittest.TestCase):
         self.assertEqual(len(today), 8)
         with self.assertRaises(tm.TMError) as cm:
             machine(now=tm.parse_now("2026-10-19 10:12"))
-        self.assertIn("not in the data", str(cm.exception))
-        self.assertIn("10:05 bar", str(cm.exception))
+        self.assertIn("no esta en los datos", str(cm.exception))
+        self.assertIn("vela de las 10:05", str(cm.exception))
         self.assertEqual(machine(now=tm.parse_now("2026-10-19 10:15"), replays=200)["mc"]["pool_sessions"], 59)
 
     def test_daylight_saving(self):
@@ -226,14 +225,14 @@ class Bars(unittest.TestCase):
         self.assertEqual(tm.eastern_offset(tm.utc_of(1793629800)), -5)
 
     def test_a_half_day_is_left_out(self):
-        def cut(res):  # 2026-09-04 ends at 1:00 PM, like a real early close: 42 bars
+        def cut(res):  # 2026-09-04 ends at 1:00 PM, like a real cierre anticipado: 42 bars
             keep_bars(res, lambda ts: not (et(ts).date().isoformat() == "2026-09-04" and et(ts).hour >= 13))
         doc = machine(text=edited(cut), replays=300)
         self.assertEqual(doc["mc"]["pool_sessions"], 58)
         self.assertEqual(doc["data"]["short_sessions_left_out"], [{"date": "2026-09-04", "bars": 42}])
         self.assertEqual(doc["history"]["sessions"], 58)
         self.assertNotIn("2026-09-04", [t["date"] for t in doc["history"]["trades"]])
-        self.assertIn("Left out 1 short session", "\n".join(tm.report(doc)))
+        self.assertIn("Se han dejado fuera 1 sesion(es) corta(s)", "\n".join(tm.report(doc)))
 
     def test_today_is_not_in_the_pool(self):
         doc = machine(replays=200)
@@ -252,7 +251,7 @@ class Bars(unittest.TestCase):
                                                   "indicators": {"quote": [{}]}}], "error": None}})
         with self.assertRaises(tm.TMError) as cm:
             machine(text=empty)
-        self.assertIn("no complete 5-minute bars", str(cm.exception))
+        self.assertIn("no hay velas completas de 5 minutos", str(cm.exception))
         gone = json.dumps({"chart": {"result": None, "error": {"code": "Not Found",
                                                                "description": "No data found, symbol may be delisted"}}})
         with self.assertRaises(tm.TMError) as cm:
@@ -266,8 +265,8 @@ class Bars(unittest.TestCase):
             keep_bars(res, lambda ts: et(ts).date().isoformat() >= "2026-09-22")
         with self.assertRaises(tm.TMError) as cm:
             machine(text=edited(trim))
-        self.assertIn("only 19 full session(s)", str(cm.exception))
-        self.assertIn("at least 20", str(cm.exception))
+        self.assertIn("solo hay 19 sesion(es) completas", str(cm.exception))
+        self.assertIn("al menos 20", str(cm.exception))
 
         def twenty(res):
             keep_bars(res, lambda ts: et(ts).date().isoformat() >= "2026-09-21")
@@ -275,7 +274,7 @@ class Bars(unittest.TestCase):
 
     def test_an_early_close_day_ends_the_replay_at_1_pm(self):
         # the fixture's bars moved onto the 30 trading days up to Friday 2026-11-27 (an NYSE 1:00 PM
-        # close), across the Nov 1 clock change, with real New York times for every bar
+        # close), across the Nov 1 clock change, with real hora de Nueva Yorks for every bar
         sessions = tm.full_sessions(tm.split_sessions(tm.parse_bars(tm.chart_result(TEXT, "TSLA"), NOW_UTC)[1]),
                                     "2026-10-19")[0][-30:]
         days, d = [], tm.datetime.date(2026, 11, 27)
@@ -299,40 +298,40 @@ class Bars(unittest.TestCase):
         later = tm.parse_now("2026-11-28 12:00")
         doc = machine(p, text=text, now=later, replays=300)
         self.assertEqual((doc["mc"]["until"], doc["mc"]["bars_left"], doc["mc"]["pool_sessions"]), ("13:00", 33, 29))
-        self.assertIn("to 1:00 PM", "\n".join(tm.report(doc)))
+        self.assertIn("a las 1:00 PM", "\n".join(tm.report(doc)))
         with self.assertRaises(tm.TMError) as cm:
             machine(p, text=text, now=later, until="15:55", replays=10)
-        self.assertIn("early close", str(cm.exception))
+        self.assertIn("cierre anticipado", str(cm.exception))
 
     def test_the_data_must_be_the_plans_ticker(self):
         with self.assertRaises(tm.TMError) as cm:
             machine(plan(symbol="AAPL"))
-        self.assertIn("data is for TSLA", str(cm.exception))
+        self.assertIn("los datos son de TSLA", str(cm.exception))
 
 
 class Plans(unittest.TestCase):
     def test_an_entry_not_in_the_data_is_refused(self):
         with self.assertRaises(tm.TMError) as cm:
             machine(plan(date="2026-10-20"))
-        self.assertIn("not in the data", str(cm.exception))
-        self.assertIn("no bars for that day", str(cm.exception))
+        self.assertIn("no esta en los datos", str(cm.exception))
+        self.assertIn("no hay velas ese dia", str(cm.exception))
         with self.assertRaises(tm.TMError) as cm:      # 10:50 has not happened in this data yet
             machine(plan(entry_time="10:55 AM", entry_bar=None))
-        self.assertIn("not in the data", str(cm.exception))
+        self.assertIn("no esta en los datos", str(cm.exception))
 
     def test_plan_checks(self):
         cases = [
-            (dict(entry_time="10:17 AM", entry_bar=None), "5-minute grid"),
-            (dict(entry_time="4:00 PM", entry_bar=None), "between 9:35 AM and 3:55 PM"),
-            (dict(entry_bar=9), "disagrees with itself"),
+            (dict(entry_time="10:17 AM", entry_bar=None), "rejilla de 5 minutos"),
+            (dict(entry_time="4:00 PM", entry_bar=None), "entre las 9:35 AM y las 3:55 PM"),
+            (dict(entry_bar=9), "se contradice"),
             (dict(entry_time=None, entry_bar=None), "entry_time"),
-            (dict(interval="1m"), "7 days of 1-min bars"),
-            (dict(stop=365.0), "stop < entry < target"),
-            (dict(side="short"), "buy or sell"),
+            (dict(interval="1m"), "7 dias de velas de 1 minuto"),
+            (dict(stop=365.0), "stop < entrada < objetivo"),
+            (dict(side="short"), "buy o sell"),
             (dict(symbol=""), "ticker"),
-            (dict(entry="abc"), "number for entry"),
-            (dict(date="Oct 19"), "date like"),
-            (dict(opening_range={"minutes": 7}), "multiple of 5"),
+            (dict(entry="abc"), "numero para entry"),
+            (dict(date="Oct 19"), "fecha como"),
+            (dict(opening_range={"minutes": 7}), "multiplo de 5"),
         ]
         for change, words in cases:
             with self.assertRaises(tm.TMError, msg=change) as cm:
@@ -349,17 +348,17 @@ class Plans(unittest.TestCase):
         doc = machine(until="15:55", replays=500)
         m = doc["mc"]
         self.assertEqual((m["until"], m["bars_left"], m["band_times"][-1]), ("15:55", 68, "15:55"))
-        self.assertIn("still open at 3:55 PM", "\n".join(tm.report(doc)))
+        self.assertIn("sigue abierta a las 3:55 PM", "\n".join(tm.report(doc)))
         self.assertEqual(machine(until="3:55 PM", replays=500)["mc"], m)
-        for bad, words in (("10:15 AM", "nothing to replay"), ("16:05", "no later than 4:00 PM"),
-                           ("15:57", "5-minute grid"), ("noon", "New York time")):
+        for bad, words in (("10:15 AM", "no deja nada que repetir"), ("16:05", "no ser posterior a las 4:00 PM"),
+                           ("15:57", "rejilla de 5 minutos"), ("noon", "hora de Nueva York")):
             with self.assertRaises(tm.TMError) as cm:
                 machine(until=bad, replays=10)
             self.assertIn(words, str(cm.exception), bad)
 
     def test_an_entry_outside_its_bar_is_flagged(self):
         doc = machine(plan(entry=368.0, stop=362.0, target=374.0), replays=200)
-        self.assertIn("outside that bar's range", doc["warnings"][0])
+        self.assertIn("esta fuera del rango de esa vela", doc["warnings"][0])
 
     def test_stop_rounds_away_from_the_entry(self):
         self.assertEqual(tm.cents_away(358.325, True), 358.32)
@@ -380,7 +379,7 @@ class Plans(unittest.TestCase):
         self.assertIsNone(doc["history"]["rule"])
         self.assertIn("orb", doc["history"]["note"])
         self.assertEqual(doc["mc"]["pool_sessions"], 59)
-        self.assertIn("History: skipped", "\n".join(tm.report(doc)))
+        self.assertIn("Historia: omitido", "\n".join(tm.report(doc)))
 
     def test_a_sell_plan_mirrors_the_rules(self):
         doc = machine(plan(side="sell", stop=370.04, target=358.32, stop_rule="or_high"), replays=2000)
@@ -390,57 +389,50 @@ class Plans(unittest.TestCase):
         self.assertEqual(doc["history"]["rule"]["stop_rule"], "or_high")
         for t in doc["history"]["trades"]:
             self.assertTrue(t["target"] < t["entry"] < t["stop"], t)
-        self.assertIn("below the entry", "\n".join(tm.report(doc)))
+        self.assertIn("por debajo de la entrada", "\n".join(tm.report(doc)))
 
     def test_the_verdict_thresholds_at_1r(self):
         # 1R: the target's share of the replays that hit one side against 50 %
-        self.assertTrue(tm.verdict({"p_target": 0.30, "p_stop": 0.26}).startswith("Close to a coin flip"))
-        self.assertTrue(tm.verdict({"p_target": 0.40, "p_stop": 0.30}).startswith("Leans toward the target"))
-        self.assertTrue(tm.verdict({"p_target": 0.20, "p_stop": 0.30}).startswith("Leans toward the stop"))
-        self.assertTrue(tm.verdict({"p_target": 0.60, "p_stop": 0.30}).startswith("Strongly toward the target"))
+        self.assertTrue(tm.verdict({"p_target": 0.30, "p_stop": 0.26}).startswith("Practicamente a cara"))
+        self.assertTrue(tm.verdict({"p_target": 0.40, "p_stop": 0.30}).startswith("Se inclina hacia el objetivo"))
+        self.assertTrue(tm.verdict({"p_target": 0.20, "p_stop": 0.30}).startswith("Se inclina hacia el stop"))
+        self.assertTrue(tm.verdict({"p_target": 0.60, "p_stop": 0.30}).startswith("Claramente hacia el objetivo"))
         self.assertEqual(tm.verdict({"p_target": 0.10, "p_stop": 0.60, "r_at_target": 1.0}),
-                         "Strongly toward the stop: target first 10.0 % vs stop first 60.0 %.")
+                         "Claramente hacia el stop: objetivo primero 10.0 % frente a stop primero 60.0 %.")
         self.assertEqual(tm.verdict({"p_target": 0.0, "p_stop": 0.0, "until": "15:55"}),
-                         "No replay reached the target or the stop by 3:55 PM: the price at 3:55 PM decides every one.")
+                         "Ninguna repeticion llego al objetivo ni al stop antes de las 3:55 PM: el precio a las 3:55 PM decide cada una.")
 
     def test_a_2r_target_is_judged_against_its_break_even(self):
         # the live TSLA run of 2026-10-20 (entry 370.58, stop 367.06, 2R target 377.62): it needs 33 %, got 32 %
         mc = {"p_target": 0.241, "p_stop": 0.505, "p_neither": 0.254, "r_at_target": 2.0, "avg_R": 0.095}
-        self.assertEqual(tm.verdict(mc), "Close to break-even: at 2R the target has to come first in 33 % of the "
-                                         "replays that hit one side; it did in 32 % (target first 24.1 % vs stop "
-                                         "first 50.5 %).")
+        self.assertEqual(tm.verdict(mc), "Practicamente en el punto de equilibrio: con 2R el objetivo tiene que llegar primero en el 33 % de las repeticiones que tocan un lado; llego primero en el 32 % (objetivo primero 24.1 % frente a stop primero 50.5 %).")
         self.assertEqual(tm.verdict_notes(mc), [])
         lean = dict(mc, p_target=0.15, p_stop=0.55)
-        self.assertTrue(tm.verdict(lean).startswith("Leans toward the stop: at 2R the target has to come first in "
-                                                    "33 % of the replays that hit one side; it did in 21 %"))
-        self.assertEqual(tm.verdict_notes(lean), ["Average R is +0.095 all the same: the replays that hit neither "
-                                                  "pull it the other way."])
-        self.assertTrue(tm.verdict(dict(mc, p_target=0.30, p_stop=0.40)).startswith("Leans toward the target"))
-        self.assertTrue(tm.verdict(dict(mc, p_target=0.40, p_stop=0.40)).startswith("Strongly toward the target"))
-        self.assertIn("at 1.5R the target has to come first in 40 %", tm.verdict(dict(mc, r_at_target=1.5)))
+        self.assertTrue(tm.verdict(lean).startswith("Se inclina hacia el stop: con 2R el objetivo tiene que llegar primero en el 33 % de las repeticiones que tocan un lado; llego primero en el 21 %"))
+        self.assertEqual(tm.verdict_notes(lean), ["La R media es +0.095 igualmente: las repeticiones que no tocan ninguno "
+                                                  "la empujan en sentido contrario."])
+        self.assertTrue(tm.verdict(dict(mc, p_target=0.30, p_stop=0.40)).startswith("Se inclina hacia el objetivo"))
+        self.assertTrue(tm.verdict(dict(mc, p_target=0.40, p_stop=0.40)).startswith("Claramente hacia el objetivo"))
+        self.assertIn("con 1.5R el objetivo tiene que llegar primero en el 40 %", tm.verdict(dict(mc, r_at_target=1.5)))
 
     def test_2r_on_the_fixture_near_break_even(self):
         # stop 362.00, 2R target 368.54: 33.5 % vs 62.4 % looks lopsided, but 2R only needs a third
         doc = machine(plan(stop=362.0, target=368.54, stop_rule="pct"))
         m = doc["mc"]
         self.assertEqual((m["r_at_target"], m["p_target"], m["p_stop"], m["avg_R"]), (2.0, 0.3345, 0.6238, 0.068))
-        self.assertEqual(doc["verdict"], "Close to break-even: at 2R the target has to come first in 33 % of the "
-                                         "replays that hit one side; it did in 35 % (target first 33.5 % vs stop "
-                                         "first 62.4 %).")
+        self.assertEqual(doc["verdict"], "Practicamente en el punto de equilibrio: con 2R el objetivo tiene que llegar primero en el 33 % de las repeticiones que tocan un lado; llego primero en el 35 % (objetivo primero 33.5 % frente a stop primero 62.4 %).")
         self.assertEqual(doc["verdict_notes"], [])
 
     def test_2r_on_the_fixture_a_clear_lean(self):
-        # the reel's entry and stop with a 2R target 375.90: the target first only 4.0 % vs stop first 25.6 %
+        # the reel's entry and stop with a 2R target 375.90: the objetivo primero only 4.0 % frente a stop primero 25.6 %
         doc = machine(plan(target=375.90))
         m = doc["mc"]
         self.assertEqual((m["r_at_target"], m["p_target"], m["p_stop"], m["p_neither"], m["avg_R"]),
                          (2.0, 0.0397, 0.2558, 0.7045, 0.042))
-        self.assertEqual(doc["verdict"], "Strongly toward the stop: at 2R the target has to come first in 33 % of "
-                                         "the replays that hit one side; it did in 13 % (target first 4.0 % vs stop "
-                                         "first 25.6 %).")
+        self.assertEqual(doc["verdict"], "Claramente hacia el stop: con 2R el objetivo tiene que llegar primero en el 33 % de las repeticiones que tocan un lado; llego primero en el 13 % (objetivo primero 4.0 % frente a stop primero 25.6 %).")
         self.assertEqual(doc["verdict_notes"], [
-            "70.5 % of the replays hit neither by 4:00 PM; the price at 4:00 PM decides those.",
-            "Average R is +0.042 all the same: the replays that hit neither pull it the other way."])
+            "El 70.5 % de las repeticiones no toca ninguno antes de las 4:00 PM; el precio a las 4:00 PM decide esas.",
+            "La R media es +0.042 igualmente: las repeticiones que no tocan ninguno la empujan en sentido contrario."])
         text = "\n".join(tm.report(doc))
         self.assertIn(doc["verdict"] + "\n" + doc["verdict_notes"][0] + "\n" + doc["verdict_notes"][1], text)
 
@@ -492,13 +484,13 @@ class Network(unittest.TestCase):
         self.answer([429, 429, 429, 429])
         with self.assertRaises(tm.TMError) as cm:
             tm.fetch_chart("TSLA")
-        self.assertIn("rate limiting", str(cm.exception))
+        self.assertIn("limitando las peticiones", str(cm.exception))
 
     def test_404(self):
         self.answer([404])
         with self.assertRaises(tm.TMError) as cm:
             tm.fetch_chart("ZZZZ")
-        self.assertIn("check the ticker", str(cm.exception))
+        self.assertIn("revisa el ticker", str(cm.exception))
 
     def test_run_over_the_network_path(self):
         self.answer([200])
@@ -529,9 +521,9 @@ class Cli(unittest.TestCase):
     def test_run_with_the_plan_end_to_end(self):
         code, text, err = run(["run", "--plan", self.plan, "--offline", TSLA, "--now", NOW, "--write", self.out])
         self.assertEqual(code, 0, err)
-        self.assertIn("target first   29.4 %", text)
-        self.assertIn("Close to a coin flip: target first 29.4 % vs stop first 25.5 %.", text)
-        self.assertIn("Wrote %s." % self.out, text)
+        self.assertIn("objetivo primero  29.4 %", text)
+        self.assertIn("Practicamente a cara o cruz: objetivo primero 29.4 % frente a stop primero 25.5 %.", text)
+        self.assertIn("Guardado %s." % self.out, text)
         self.assertIn("/trader-budget", text)
         with open(self.out) as fh:
             doc = json.load(fh)
@@ -549,7 +541,7 @@ class Cli(unittest.TestCase):
         doc = json.loads(text)
         self.assertEqual(doc["mc"]["p_stop"], 0.2548)
         self.assertNotIn("sample_paths", doc["mc"])
-        self.assertEqual(doc["verdict"][:20], "Close to a coin flip")
+        self.assertEqual(doc["verdict"][:20], "Practicamente a cara")
         self.assertFalse(os.path.exists(self.out))
 
     def test_the_plan_as_flags_matches_the_file(self):
@@ -598,14 +590,14 @@ class Cli(unittest.TestCase):
         code, text, _ = run(["chart", "--from", self.out])
         self.assertEqual(code, 0)
         lines = text.splitlines()
-        self.assertIn("2,000 replay paths from the 10:15 AM entry (seed 19)", lines[0])
+        self.assertIn("2,000 trayectorias desde la entrada de las 10:15 AM (semilla 19)", lines[0])
         self.assertTrue(any(l.startswith("   370.04 |") and l.endswith("  target") for l in lines))
         self.assertTrue(any(l.startswith("   358.32 |") and l.endswith("  stop") for l in lines))
         self.assertTrue(any(l.startswith("   364.18 |*") and l.endswith("  entry") for l in lines))
         self.assertIn("10:15", text)
         self.assertIn("4:00", text)
-        self.assertEqual(lines[-2:], ["Close to a coin flip: target first 29.4 % vs stop first 25.5 %.",
-                                      "45.1 % of the replays hit neither by 4:00 PM; the price at 4:00 PM decides those."])
+        self.assertEqual(lines[-2:], ["Practicamente a cara o cruz: objetivo primero 29.4 % frente a stop primero 25.5 %.",
+                                      "El 45.1 % de las repeticiones no toca ninguno antes de las 4:00 PM; el precio a las 4:00 PM decide esas."])
         code, again, _ = run(["chart", "--plan", self.plan, "--offline", TSLA, "--now", NOW])
         self.assertEqual(again, text)
 

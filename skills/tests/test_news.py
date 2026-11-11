@@ -42,12 +42,12 @@ class Feeds(unittest.TestCase):
         earn = items[1]
         self.assertEqual(earn["items"], ["2.02", "9.01"])
         self.assertTrue(earn["important"])
-        self.assertEqual(earn["title"], "Apple Inc. filed a 8-K: earnings results")
+        self.assertEqual(earn["title"], "Apple Inc. presento un 8-K: resultados")
         self.assertEqual(earn["id"], "sec:0000320193-26-000018")
         self.assertIn("000032019326000018", earn["link"])
-        # 16:30:28 New York time is 20:30:28 UTC
+        # 16:30:28 hora de Nueva York is 20:30:28 UTC
         self.assertEqual(earn["time"].isoformat(), "2026-07-30T20:30:28+00:00")
-        self.assertEqual(items[0]["title"], "Apple Inc. filed a 8-K/A: director or officer change")
+        self.assertEqual(items[0]["title"], "Apple Inc. presento un 8-K/A: cambio de consejero o directivo")
 
     def test_times(self):
         self.assertEqual(news.parse_time("Tue, 13 Oct 2026 20:02:03 +0000").hour, 20)
@@ -103,14 +103,14 @@ class Check(unittest.TestCase):
         self.assertEqual(len(data["items"]), 10)  # 6 Apple + 4 Coca-Cola headlines, filings are older
         code, out, _ = run(["--tickers", "AAPL", "KO", "--hours", "24"] + self.base)
         self.assertEqual(code, 1)
-        self.assertIn("Nothing new.", out)
+        self.assertIn("Nada nuevo.", out)
 
     def test_filings_show_in_a_wider_window(self):
         code, out, err = run(["--tickers", "AAPL", "--hours", "2400"] + self.base)
         self.assertEqual(code, 0, err)
-        self.assertIn("! 2026-07-30 16:30 ET  AAPL", out)  # 20:30 UTC, New York time
-        self.assertIn("earnings results", out)
-        self.assertIn("Not financial advice", out)
+        self.assertIn("! 2026-07-30 16:30 ET  AAPL", out)  # 20:30 UTC, hora de Nueva York
+        self.assertIn("resultados", out)
+        self.assertIn("No es asesoramiento financiero", out)
         self.assertNotIn(chr(0x2014), out)
 
     def test_tickers_from_watchlist_and_plan(self):
@@ -132,7 +132,7 @@ class Check(unittest.TestCase):
     def test_no_tickers_is_an_error(self):
         code, _, err = run(self.base)
         self.assertEqual(code, 2)
-        self.assertIn("no tickers", err)
+        self.assertIn("no hay tickers", err)
 
     def test_sec_needs_a_user_agent(self):
         old = os.environ.pop("SEC_USER_AGENT", None)
@@ -156,14 +156,14 @@ class Check(unittest.TestCase):
         self.assertIn("Tesla-SpaceX Merger Mania Strikes Wall Street Ahead of Earnings", out)
         merger = [l for l in out.splitlines() if "Merger Mania" in l]
         tags = out.splitlines()[out.splitlines().index(merger[0]) + 1]
-        self.assertIn("earnings", tags)
-        self.assertIn("deal", tags)
-        self.assertIn("Checked 2026-10-19 10:15 ET", out)
+        self.assertIn("resultados", tags)
+        self.assertIn("operacion", tags)
+        self.assertIn("Revisado 2026-10-19 10:15 ET", out)
         self.assertEqual(len([l for l in out.splitlines() if l.startswith("  2026-10-19")]), 16)  # 18 in the feed, 2 after 10:15
         # the price line, from the chart fetched at 10:52
         code, out, err = run(["--tickers", "TSLA", "--hours", "6", "--no-sec", "--dry-run",
                               "--now", "2026-10-19T10:52:00-04:00"] + self.base[:4])
-        self.assertRegex(out, r"TSLA\s+366\.4[78] \+3\.31% vs yesterday's close 354\.72 at 10:52 ET  MOVING")
+        self.assertRegex(out, r"TSLA\s+366\.4[78] \+3\.31% frente al cierre de ayer 354\.72 at 10:52 ET  SE MUEVE")
 
     def test_moves(self):
         m = news.parse_chart(raw("chart-TSLA.json"), "TSLA")
@@ -171,13 +171,13 @@ class Check(unittest.TestCase):
         self.assertEqual(m["pct"], 3.31)
         self.assertEqual(news.to_eastern(m["time"]).strftime("%H:%M"), "10:52")
         quiet = dict(m, pct=1.2)
-        self.assertNotIn("MOVING", news.render_moves([quiet])[0])
-        self.assertIn("MOVING", news.render_moves([quiet], move_pct=1.0)[0])
+        self.assertNotIn("SE MUEVE", news.render_moves([quiet])[0])
+        self.assertIn("SE MUEVE", news.render_moves([quiet], move_pct=1.0)[0])
         with self.assertRaises(news.NewsError):
             news.parse_chart(b'{"chart": {"result": null}}', "ZZZZ")
         # no chart file offline: no move line, no error note
         code, out, _ = run(["--tickers", "KO", "--hours", "24", "--dry-run"] + self.base)
-        self.assertNotIn("vs yesterday's close", out)
+        self.assertNotIn("frente al cierre de ayer", out)
         self.assertNotIn("note:", out)
 
     def test_new_york_time_follows_daylight_saving(self):
