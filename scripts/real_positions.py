@@ -76,6 +76,8 @@ def register_exit(state, symbol, price, today, shares=None):
     matches = [p for p in state["open"] if p["symbol"] == symbol]
     if not matches:
         return state, f"No tengo ninguna posicion abierta en {symbol}."
+    if shares is not None and shares <= 0:
+        return state, "Las acciones a vender tienen que ser mayor que cero."
     position = matches[0]
     held = position.get("shares")
     if shares is not None and held is not None and shares > held:

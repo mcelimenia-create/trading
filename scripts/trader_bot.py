@@ -197,7 +197,7 @@ def telegram_job(notify, token, chat_id):
     replies = []
     messages = telegram_io.text_messages(updates, chat_id)
     print(f"telegram: updates={len(updates)} mensajes_del_chat={len(messages)} offset={offset}")
-    market = market_context() if messages else None
+    market = market_context_or_none() if messages else None
     for update_id, text in messages:
         state, reply = real_positions.handle_command(state, text, real_fetch, market=market)
         replies.append(reply)
@@ -236,6 +236,15 @@ def market_context():
     state, fx = regime.fetch_context(cfg)
     return {"cfg": cfg, "fx": fx, "state": state["state"], "exposure_factor": state["exposure_factor"],
             "candidates": load_candidates()}
+
+
+def market_context_or_none():
+    """Si falla el contexto de mercado, los comandos que no lo necesitan siguen funcionando."""
+    try:
+        return market_context()
+    except (OSError, ValueError, KeyError) as error:
+        print(f"Sin contexto de mercado: {error}", file=sys.stderr)
+        return None
 
 
 def portfolio_warnings(state):

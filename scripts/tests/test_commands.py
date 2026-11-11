@@ -69,6 +69,12 @@ class PartialExitTest(unittest.TestCase):
         self.assertEqual(state["closed"], [])
         self.assertIn("solo tienes 10", reply)
 
+    def test_zero_shares_is_rejected(self):
+        state, reply = real_positions.handle_command(opened(), "sali TSLA 110 0", lambda s: [])
+        self.assertEqual(state["open"][0]["shares"], 10)
+        self.assertEqual(state["closed"], [])
+        self.assertIn("mayor que cero", reply)
+
     def test_exit_without_shares_closes_everything(self):
         state, _ = real_positions.handle_command(opened(), "sali TSLA 110", lambda s: [])
         self.assertEqual(state["open"], [])
