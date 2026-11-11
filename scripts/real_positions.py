@@ -99,7 +99,7 @@ def exit_alerts(position, bars):
     start = dates.index(position["entry_date"])
     alerts = []
     last = len(bars) - 1
-    if last <= start:
+    if last <= start or last < paper_trader.TRAIL_DAYS:
         return alerts
     if position["stop"] is not None and bars[last]["low"] <= position["stop"]:
         alerts.append(("stop", f"toco el stop de referencia {position['stop']:.2f} el {bars[last]['date']}"))
