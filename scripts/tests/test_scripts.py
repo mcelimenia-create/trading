@@ -52,6 +52,16 @@ class PaperSignalTest(unittest.TestCase):
         self.assertEqual(state["pending"], [])
 
 
+class MarkToMarketTest(unittest.TestCase):
+    def test_open_positions_get_their_last_close(self):
+        bars = make_bars([100, 105, 110])
+        state = {"pending": [], "positions": [{"symbol": "TEST", "entry": 100}], "closed": []}
+        marked = paper_trader.mark_to_market(state, {"TEST": bars})
+        self.assertEqual(marked["positions"][0]["last_close"], 110)
+        self.assertEqual(marked["positions"][0]["last_date"], bars[-1]["date"])
+        self.assertNotIn("last_close", state["positions"][0])
+
+
 class WeightTest(unittest.TestCase):
     def test_weight_risks_two_percent_of_the_book(self):
         self.assertAlmostEqual(paper_trader.weight_for(100, 90), 0.2)

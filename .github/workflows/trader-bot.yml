@@ -47,11 +47,12 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          STATE_KEY: ${{ secrets.STATE_KEY }}
           TRADER_DIR: ${{ runner.temp }}/bot-state/trader
         run: python3 scripts/trader_bot.py "$JOB"
 
       - name: Publicar panel (docs/data)
-        if: always() && !cancelled() && (env.JOB == 'news' || env.JOB == 'paper' || env.JOB == 'candidates')
+        if: always() && !cancelled() && (env.JOB == 'news' || env.JOB == 'paper' || env.JOB == 'candidates' || env.JOB == 'telegram')
         run: |
           git config user.name "trader-bot"
           git config user.email "trader-bot@users.noreply.github.com"

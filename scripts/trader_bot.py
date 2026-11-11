@@ -7,6 +7,7 @@
 
 Solo lee datos publicos y envia avisos. Nunca envia ordenes a un broker.
 """
+import hashlib
 import json
 import os
 import subprocess
@@ -21,6 +22,7 @@ from zoneinfo import ZoneInfo
 import candidates
 import catalysts
 import fundamentals
+import real_crypto
 import paper_trader
 import real_positions
 import regime
@@ -35,6 +37,8 @@ ENV_FILE = ROOT / ".env"
 PAPER_FILE = TRADER_DIR / "paper.json"
 REAL_FILE = TRADER_DIR / "real.json"
 OFFSET_FILE = TRADER_DIR / "telegram_offset.json"
+REAL_DIGEST_FILE = TRADER_DIR / "real_published.sha256"
+REAL_PUBLIC_FILE = ROOT / "docs" / "data" / "real.enc"
 CANDIDATE_CONFIG = ROOT / "config" / "candidates.json"
 PORTFOLIO_FILE = ROOT / "config" / "portfolio.json"
 SEC_EXCHANGES_URL = "https://www.sec.gov/files/company_tickers_exchange.json"
@@ -280,6 +284,22 @@ def report_failure(job, error, notify):
         print(f"No pude avisar del fallo por Telegram: {send_error}", file=sys.stderr)
 
 
+def publish_real():
+    """Publica las posiciones reales cifradas en docs/data, solo cuando cambian."""
+    if not REAL_FILE.exists():
+        return
+    passphrase = os.environ.get("STATE_KEY", "")
+    if not passphrase:
+        raise RuntimeError("falta STATE_KEY: no puedo publicar las posiciones reales cifradas")
+    plain = REAL_FILE.read_bytes()
+    digest = hashlib.sha256(plain).hexdigest()
+    if REAL_DIGEST_FILE.exists() and REAL_DIGEST_FILE.read_text(encoding="utf-8").strip() == digest:
+        return
+    DOCS_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    REAL_PUBLIC_FILE.write_bytes(real_crypto.encrypt(plain, passphrase))
+    REAL_DIGEST_FILE.write_text(digest, encoding="utf-8")
+
+
 def publish_dashboard(job, ok=True):
     """Copia el estado de papel y la hora de la ultima ejecucion a docs/data (panel de GitHub Pages)."""
     DOCS_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -313,7 +333,10 @@ def main(argv):
 
     try:
         if argv[1] == "telegram":
-            telegram_job(notify, token, chat_id)
+            try:
+                telegram_job(notify, token, chat_id)
+            finally:
+                publish_real()
         else:
             jobs[argv[1]](notify)
     except Exception as error:

@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="Trading bot">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Panel del bot de trading</title>
 <style>
   :root {
@@ -75,6 +76,9 @@
     background: var(--glass-strong); border: 1px solid var(--line); white-space: nowrap;
   }
   .live { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--pos); box-shadow: 0 0 8px var(--pos); margin-right: 6px; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 6px; background: var(--warn); }
+  .dot.pos { background: var(--pos); }
+  .dot.neg { background: var(--neg); }
 
   .tabs {
     display: flex; gap: 4px; padding: 4px; margin: 0 0 18px;
@@ -97,7 +101,7 @@
   .pos { color: var(--pos); } .neg { color: var(--neg); } .warn { color: var(--warn); }
 
   .panel { padding: 16px; }
-  .panel-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+  .panel-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
   .panel-title span { color: var(--muted); font-size: .8rem; }
   .chart { width: 100%; height: auto; display: block; }
   .two { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; }
@@ -112,8 +116,8 @@
     display: inline-block; font-size: .72rem; font-weight: 600; padding: 3px 8px; border-radius: 999px;
     background: rgba(10, 132, 255, 0.18); color: #64b5ff;
   }
-  .badge.pos { background: rgba(48, 209, 88, 0.16); }
-  .badge.neg { background: rgba(255, 69, 58, 0.16); }
+  .badge.pos { background: rgba(48, 209, 88, 0.16); color: var(--pos); }
+  .badge.neg { background: rgba(255, 69, 58, 0.16); color: var(--neg); }
   .empty { padding: 16px 8px; color: var(--muted); }
 
   .note { color: var(--muted); font-size: .85rem; line-height: 1.5; }
@@ -121,12 +125,22 @@
   .cmds { margin: 10px 0 0; padding-left: 18px; line-height: 1.8; }
   code { background: var(--glass-strong); padding: 2px 6px; border-radius: 6px; font-size: .85rem; }
 
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+  .toolbar select, .toolbar label, .form input, .form button {
+    font: inherit; font-size: .88rem; color: var(--text); background: var(--glass-strong);
+    border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px;
+  }
+  .toolbar label { color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+  .form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .form input { flex: 1; min-width: 200px; }
+  .form button { background: var(--accent); border: 0; font-weight: 600; cursor: pointer; }
+
   .news { display: grid; gap: 10px; }
+  .day { color: var(--muted); font-size: .78rem; margin: 18px 0 4px; text-transform: uppercase; letter-spacing: .04em; }
   .news-item { padding: 14px 16px; display: block; color: inherit; text-decoration: none; transition: background .2s; }
   .news-item:hover { background: var(--glass-strong); }
   .news-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--muted); font-size: .78rem; }
   .news-title { font-size: .98rem; font-weight: 600; margin: 8px 0 0; line-height: 1.35; }
-  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); display: inline-block; }
   footer { margin-top: 28px; }
 </style>
 </head>
@@ -150,14 +164,17 @@
   <section class="view" id="view-simulado">
     <div class="kpis" id="kpis"></div>
 
-    <h2>Curva de la cartera simulada</h2>
+    <h2>Resultado de la cartera simulada</h2>
     <div class="glass panel">
-      <div class="panel-title"><strong>Suma de resultados por operación</strong><span id="curveNote"></span></div>
+      <div class="panel-title"><strong>Suma ponderada por tamaño (% del capital)</strong><span id="curveNote"></span></div>
       <div id="curve"></div>
     </div>
 
     <h2>Candidatos de medio plazo</h2>
-    <div class="glass panel"><div class="table-wrap"><table id="cands"></table></div></div>
+    <div class="glass panel">
+      <div class="note" id="regimeNote" style="margin-bottom:10px"></div>
+      <div class="table-wrap"><table id="cands"></table></div>
+    </div>
 
     <div class="two">
       <div>
@@ -177,12 +194,24 @@
   <!-- OPERACIONES REALES -->
   <section class="view" id="view-reales" hidden>
     <div class="glass panel">
-      <div class="panel-title"><strong>Tus posiciones reales</strong><span>Privadas</span></div>
-      <p class="note">Este panel es público, así que tus posiciones reales no se publican aquí. Gestiónalas desde Telegram:</p>
+      <div class="panel-title"><strong>Tus posiciones reales</strong><span>Cifradas</span></div>
+      <p class="note">Las posiciones se publican cifradas. Para verlas, escribe tu frase de paso. No se guarda en ningún sitio y solo se usa en este navegador.</p>
+      <form class="form" id="realForm" autocomplete="off">
+        <input type="password" id="realPass" placeholder="Frase de paso" required>
+        <button type="submit">Ver posiciones</button>
+      </form>
+      <div class="msg" id="realMsg"></div>
+      <div class="table-wrap" style="margin-top:12px"><table id="realOpen"></table></div>
+      <div class="table-wrap" style="margin-top:12px"><table id="realClosed"></table></div>
+    </div>
+    <div class="glass panel" style="margin-top:12px">
+      <div class="panel-title"><strong>Gestión desde Telegram</strong></div>
       <ul class="cmds">
         <li><code>entre TICKER PRECIO [ACCIONES]</code>: registrar una entrada</li>
-        <li><code>sali TICKER PRECIO</code>: registrar una salida</li>
-        <li><code>posiciones</code>: ver las posiciones abiertas</li>
+        <li><code>sali TICKER PRECIO [ACCIONES]</code>: registrar una salida, total o parcial</li>
+        <li><code>stop TICKER PRECIO</code>: cambiar el stop</li>
+        <li><code>riesgo TICKER ENTRADA STOP</code>: tamaño en acciones y EUR</li>
+        <li><code>resumen</code>, <code>posiciones</code>, <code>candidatos</code></li>
       </ul>
     </div>
     <div class="warnbox" style="margin-top:12px">El bot te avisa por Telegram cuando se cumple la regla de salida de una posición real. No compra ni vende nada.</div>
@@ -191,6 +220,10 @@
   <!-- NOTICIAS -->
   <section class="view" id="view-noticias" hidden>
     <h2>Últimas noticias de la lista vigilada</h2>
+    <div class="toolbar">
+      <select id="newsTicker" aria-label="Filtrar por valor"><option value="">Todos los valores</option></select>
+      <label><input type="checkbox" id="newsImportant"> Solo relevantes</label>
+    </div>
     <div class="news" id="news"></div>
   </section>
 
@@ -201,15 +234,37 @@
 </main>
 
 <script>
+const CONFIG = { staleHours: { news: 12 }, defaultStaleHours: 30, views: ["simulado", "reales", "noticias"] };
+const $ = (id) => document.getElementById(id);
 const fmtPct = (x) => (x * 100).toFixed(2) + "%";
 const signed = (x) => (x >= 0 ? "+" : "") + (x * 100).toFixed(2) + "%";
 const cls = (x) => (x >= 0 ? "pos" : "neg");
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const DAY_MS = 864e5;
 
 function table(el, headers, rows, emptyText) {
   if (!rows.length) { el.innerHTML = `<tr><td class="empty">${emptyText}</td></tr>`; return; }
   el.innerHTML = "<thead><tr>" + headers.map((h) => `<th>${h}</th>`).join("") + "</tr></thead><tbody>" +
     rows.map((r) => "<tr>" + r.map((c) => `<td>${c}</td>`).join("") + "</tr>").join("") + "</tbody>";
+}
+
+function parseStamp(text) {
+  if (!text) return null;
+  const date = new Date(text.replace(" (fallo)", "").replace(" ", "T").replace(" UTC", "Z"));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function healthChips(status, now) {
+  return Object.entries(status).map(([job, text]) => {
+    const at = parseStamp(text);
+    const hours = at ? (now - at) / 36e5 : Infinity;
+    const limit = CONFIG.staleHours[job] ?? CONFIG.defaultStaleHours;
+    const failed = String(text).includes("(fallo)");
+    const stale = hours > limit;
+    const state = failed ? "fallo" : stale ? "retrasado" : "al día";
+    const dot = failed || stale ? "neg" : "pos";
+    return `<span class="chip"><span class="dot ${dot}"></span>${esc(job)} · ${esc(text)} · ${state}</span>`;
+  }).join("");
 }
 
 function stats(closed) {
@@ -220,14 +275,25 @@ function stats(closed) {
   const lossSum = Math.abs(losses.reduce((a, b) => a + b, 0));
   const factor = lossSum ? wins.reduce((a, b) => a + b, 0) / lossSum : null;
   const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
-  return { n: rets.length, hit: wins.length / rets.length, mean, factor, total: rets.reduce((a, b) => a + b, 0) };
+  return { n: rets.length, hit: wins.length / rets.length, mean, factor };
 }
 
-function curveSVG(closed) {
-  if (closed.length < 2) return `<p class="empty">Hará falta más de una operación cerrada para dibujar la curva.</p>`;
+// Puntos de la curva: suma de ret * peso (fraccion del capital), en % del capital.
+function weightedPoints(closed) {
   const sorted = closed.slice().sort((a, b) => (a.exit_date > b.exit_date ? 1 : -1));
   let acc = 0;
-  const points = [0, ...sorted.map((c) => (acc += c.ret * 100))];
+  return [0, ...sorted.map((c) => (acc += c.ret * (c.weight ?? 0) * 100))];
+}
+
+// Caida maxima desde un maximo previo, en puntos porcentuales del capital (valor negativo).
+function maxDrawdown(points) {
+  let peak = points[0], worst = 0;
+  for (const v of points) { peak = Math.max(peak, v); worst = Math.min(worst, v - peak); }
+  return worst;
+}
+
+function curveSVG(points) {
+  if (points.length < 3) return `<p class="empty">Hará falta más de una operación cerrada para dibujar la curva.</p>`;
   const W = 600, H = 180, P = 14;
   const min = Math.min(0, ...points), max = Math.max(0, ...points);
   const span = max - min || 1;
@@ -245,54 +311,140 @@ function curveSVG(closed) {
   </svg>`;
 }
 
+function sizeCell(size) {
+  if (!size || !size.shares) return "-";
+  return `${size.shares.toFixed(4)} · ~${Math.round(size.position_eur)} EUR`;
+}
+
+function daysBetween(from, to) {
+  return Math.round((new Date(to) - new Date(from)) / DAY_MS);
+}
+
 function renderSimulado(state, cands) {
   const closed = state.closed || [];
   const s = stats(closed);
+  const points = weightedPoints(closed);
+  const regime = cands.regime || { state: "desconocido" };
   const kpis = [
     ["Operaciones cerradas", s ? s.n : 0],
-    ["Acierto", s ? fmtPct(s.hit) : "-", ""],
+    ["Acierto", s ? fmtPct(s.hit) : "-"],
     ["Media por operación", s ? `<span class="${cls(s.mean)}">${signed(s.mean)}</span>` : "-"],
     ["Factor de beneficio", s && s.factor !== null ? s.factor.toFixed(2) : "-"],
+    ["Caída máxima", closed.length ? `<span class="neg">${(maxDrawdown(points)).toFixed(2)}%</span>` : "-"],
+    ["Régimen", `<span class="${regime.state === "normal" ? "pos" : "warn"}">${esc(regime.state)}</span>`],
     ["Posiciones abiertas", (state.positions || []).length],
     ["Señales pendientes", (state.pending || []).length],
   ];
-  document.getElementById("kpis").innerHTML = kpis.map(([l, v]) =>
+  $("kpis").innerHTML = kpis.map(([l, v]) =>
     `<div class="glass kpi"><div class="label">${l}</div><div class="value">${v}</div></div>`).join("");
 
-  document.getElementById("curve").innerHTML = curveSVG(closed);
-  document.getElementById("curveNote").textContent = s ? `Total: ${signed(s.total / 1)}` : "";
+  const total = points[points.length - 1];
+  $("curve").innerHTML = curveSVG(points);
+  $("curveNote").textContent = closed.length ? `Total: ${total >= 0 ? "+" : ""}${total.toFixed(2)}% del capital` : "";
 
-  table(document.getElementById("cands"), ["Valor", "Día", "Cierre", "Stop de referencia", "Ingresos", "Invalida si"],
-    (cands.candidates || []).map((c) => [`<span class="badge">${esc(c.symbol)}</span>`, esc(c.date), c.close.toFixed(2), c.stop.toFixed(2), esc(c.growth), esc(c.invalidation)]),
+  const reasons = (regime.reasons || []).join("; ");
+  $("regimeNote").textContent = regime.state === "normal"
+    ? `Régimen normal. Tipo EUR/USD: ${cands.usd_per_eur ? cands.usd_per_eur.toFixed(4) : "sin dato"}.`
+    : `Régimen ${regime.state}${reasons ? ": " + reasons : ""}. Los tamaños ya están reducidos a la mitad.`;
+
+  const sortedCands = (cands.candidates || []).slice().sort((a, b) =>
+    (a.close - a.stop) / a.close - (b.close - b.stop) / b.close);
+  table($("cands"), ["Valor", "Cierre", "Stop", "Riesgo al stop", "Tamaño", "Ingresos", "Invalida si"],
+    sortedCands.map((c) => [`<span class="badge">${esc(c.symbol)}</span>`, c.close.toFixed(2), c.stop.toFixed(2),
+      fmtPct((c.close - c.stop) / c.close), sizeCell(c.size), esc(c.growth), esc(c.invalidation)]),
     "Hoy no hay candidatos.");
 
-  table(document.getElementById("pending"), ["Valor", "Día", "Cierre", "Stop"],
+  table($("pending"), ["Valor", "Día", "Cierre", "Stop"],
     (state.pending || []).map((p) => [esc(p.symbol), esc(p.signal_date), p.signal_close.toFixed(2), p.stop_estimate.toFixed(2)]),
     "No hay señales pendientes.");
 
-  table(document.getElementById("open"), ["Valor", "Entrada", "Precio", "Stop", "Peso"],
-    (state.positions || []).map((p) => [esc(p.symbol), esc(p.entry_date), p.entry.toFixed(2), p.stop.toFixed(2), fmtPct(p.weight)]),
+  const today = new Date().toISOString().slice(0, 10);
+  table($("open"), ["Valor", "Entrada", "Precio", "Resultado", "Stop", "Peso", "Días"],
+    (state.positions || []).map((p) => {
+      const last = p.last_close ?? p.entry;
+      const ret = (last - p.entry) / p.entry;
+      return [esc(p.symbol), p.entry.toFixed(2), last.toFixed(2),
+        `<span class="badge ${cls(ret)}">${signed(ret)}</span>`, p.stop.toFixed(2), fmtPct(p.weight),
+        daysBetween(p.entry_date, p.last_date || today)];
+    }),
     "No hay posiciones abiertas.");
 
-  table(document.getElementById("closed"), ["Valor", "Entrada", "Salida", "Motivo", "Precio salida", "Resultado"],
+  table($("closed"), ["Valor", "Entrada", "Salida", "Motivo", "Precio salida", "Resultado"],
     closed.slice().reverse().map((c) => [esc(c.symbol), esc(c.entry_date), esc(c.exit_date), esc(c.reason),
       c.exit.toFixed(2), `<span class="badge ${cls(c.ret)}">${signed(c.ret)}</span>`]),
     "Todavía no hay operaciones cerradas.");
 }
 
 function renderNews(doc) {
-  const items = doc.items || [];
-  const el = document.getElementById("news");
-  if (!items.length) { el.innerHTML = `<div class="glass panel empty">Todavía no hay noticias publicadas.</div>`; return; }
-  el.innerHTML = items.map((n) => `
+  const all = doc.items || [];
+  const select = $("newsTicker");
+  const tickers = [...new Set(all.map((n) => n.ticker))].sort();
+  const current = select.value;
+  select.innerHTML = `<option value="">Todos los valores</option>` +
+    tickers.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
+  select.value = tickers.includes(current) ? current : "";
+
+  const onlyImportant = $("newsImportant").checked;
+  const items = all.filter((n) => (!select.value || n.ticker === select.value) && (!onlyImportant || n.important));
+  const el = $("news");
+  if (!items.length) { el.innerHTML = `<div class="glass panel empty">No hay noticias con este filtro.</div>`; return; }
+
+  const byDay = {};
+  for (const n of items) {
+    const day = (n.time || "sin fecha").slice(0, 10);
+    (byDay[day] = byDay[day] || []).push(n);
+  }
+  el.innerHTML = Object.keys(byDay).sort().reverse().map((day) => `
+    <div class="day">${esc(day)}</div>
+    ${byDay[day].map((n) => `
     <a class="glass news-item" href="${esc(n.link)}" target="_blank" rel="noopener noreferrer">
       <div class="news-meta">
         <span class="badge">${esc(n.ticker)}</span>
         ${n.important ? '<span class="dot" title="Relevante"></span>' : ""}
-        <span>${esc(n.source)}</span><span>·</span><span>${esc((n.time || "").slice(0, 16).replace("T", " "))}</span>
+        <span>${esc(n.source)}</span><span>·</span><span>${esc((n.time || "").slice(11, 16))}</span>
       </div>
       <div class="news-title">${esc(n.title)}</div>
-    </a>`).join("");
+    </a>`).join("")}`).join("");
+}
+
+async function decryptOpenssl(buffer, passphrase) {
+  const bytes = new Uint8Array(buffer);
+  if (new TextDecoder().decode(bytes.slice(0, 8)) !== "Salted__") throw new Error("formato no valido");
+  const salt = bytes.slice(8, 16);
+  const data = bytes.slice(16);
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase), "PBKDF2", false, ["deriveBits"]);
+  const bits = new Uint8Array(await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt, iterations: 200000, hash: "SHA-256" }, base, 48 * 8));
+  const key = await crypto.subtle.importKey("raw", bits.slice(0, 32), "AES-CBC", false, ["decrypt"]);
+  const plain = await crypto.subtle.decrypt({ name: "AES-CBC", iv: bits.slice(32, 48) }, key, data);
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
+function renderReal(doc) {
+  const open = doc.open || [], closed = doc.closed || [];
+  table($("realOpen"), ["Valor", "Entrada", "Precio entrada", "Acciones", "Stop"],
+    open.map((p) => [esc(p.symbol), esc(p.entry_date), Number(p.entry).toFixed(2), p.shares ?? "-",
+      p.stop ? Number(p.stop).toFixed(2) : "-"]),
+    "No tienes posiciones abiertas.");
+  table($("realClosed"), ["Valor", "Entrada", "Salida", "Precio salida", "Resultado"],
+    closed.slice().reverse().map((c) => [esc(c.symbol), esc(c.entry_date), esc(c.exit_date),
+      Number(c.exit).toFixed(2), `<span class="badge ${cls(c.ret)}">${signed(c.ret)}</span>`]),
+    "No tienes operaciones cerradas.");
+}
+
+async function unlockReal(event) {
+  event.preventDefault();
+  const msg = $("realMsg");
+  msg.textContent = "Descifrando…";
+  try {
+    const res = await fetch("data/real.enc?t=" + Date.now());
+    if (!res.ok) throw new Error("no hay posiciones publicadas todavía");
+    const doc = await decryptOpenssl(await res.arrayBuffer(), $("realPass").value);
+    renderReal(doc);
+    msg.textContent = "Posiciones descifradas en este navegador.";
+  } catch (err) {
+    msg.textContent = "No pude descifrar: revisa la frase de paso (" + err.message + ").";
+  }
 }
 
 async function getJSON(path) {
@@ -302,23 +454,19 @@ async function getJSON(path) {
 }
 
 async function load() {
-  try {
-    const status = await getJSON("data/status.json").catch(() => ({}));
-    const chips = Object.entries(status).map(([job, at]) => `<span class="chip">${esc(job)} · ${esc(at)}</span>`);
-    document.getElementById("status").innerHTML =
-      `<span class="chip"><span class="live"></span>En marcha</span>` + (chips.join("") || `<span class="chip">Sin ejecuciones aún</span>`);
+  const now = new Date();
+  const status = await getJSON("data/status.json").catch(() => ({}));
+  $("status").innerHTML = `<span class="chip"><span class="live"></span>En marcha</span>` +
+    (healthChips(status, now) || `<span class="chip">Sin ejecuciones aún</span>`);
 
-    const state = await getJSON("data/paper.json").catch(() => ({ pending: [], positions: [], closed: [] }));
-    const cands = await getJSON("data/candidates.json").catch(() => ({ candidates: [] }));
-    renderSimulado(state, cands);
+  const state = await getJSON("data/paper.json").catch(() => ({ pending: [], positions: [], closed: [] }));
+  const cands = await getJSON("data/candidates.json").catch(() => ({ candidates: [] }));
+  renderSimulado(state, cands);
 
-    const news = await getJSON("data/news.json").catch(() => ({ items: [] }));
-    renderNews(news);
+  const news = await getJSON("data/news.json").catch(() => ({ items: [] }));
+  renderNews(news);
 
-    document.getElementById("updated").textContent = "Página cargada: " + new Date().toLocaleString("es-ES");
-  } catch (err) {
-    document.getElementById("status").innerHTML = `<span class="chip neg">Error: ${esc(err.message)}</span>`;
-  }
+  $("updated").textContent = "Página cargada: " + now.toLocaleString("es-ES");
 }
 
 function trackPointer(e) {
@@ -341,12 +489,21 @@ document.addEventListener("pointermove", trackPointer);
 document.addEventListener("pointerout", releaseKpi);
 
 function showView(name) {
+  if (!CONFIG.views.includes(name)) name = "simulado";
   document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-selected", String(t.dataset.view === name)));
   document.querySelectorAll(".view").forEach((v) => { v.hidden = v.id !== "view-" + name; });
+  history.replaceState(null, "", "#" + name);
 }
 document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => showView(t.dataset.view)));
+showView(location.hash.slice(1));
 
-load();
+$("newsTicker").addEventListener("change", () => getJSON("data/news.json").then(renderNews).catch(() => {}));
+$("newsImportant").addEventListener("change", () => getJSON("data/news.json").then(renderNews).catch(() => {}));
+$("realForm").addEventListener("submit", unlockReal);
+
+load().catch((err) => {
+  $("status").innerHTML = `<span class="chip neg">Error: ${esc(err.message)}</span>`;
+});
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }

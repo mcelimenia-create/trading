@@ -210,6 +210,17 @@ def save_state(path, state):
     path.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 
+def mark_to_market(state, bars_by_symbol):
+    """Anade a cada posicion abierta el ultimo cierre disponible (para el panel)."""
+    marked = copy.deepcopy(state)
+    for position in marked["positions"]:
+        bars = bars_by_symbol.get(position["symbol"])
+        if bars:
+            position["last_close"] = bars[-1]["close"]
+            position["last_date"] = bars[-1]["date"]
+    return marked
+
+
 def paper_job(notify, tickers, state_path):
     bars_by_symbol = {}
     failed = []
@@ -219,6 +230,7 @@ def paper_job(notify, tickers, state_path):
         except (OSError, KeyError, IndexError, ValueError):
             failed.append(symbol)
     state, events = run_day(load_state(state_path), bars_by_symbol)
+    state = mark_to_market(state, bars_by_symbol)
     save_state(state_path, state)
     if events:
         text = DISCLAIMER + "\n\n" + format_events(events) + "\n\nResumen: " + summary(state["closed"])
