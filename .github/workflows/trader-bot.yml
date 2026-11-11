@@ -5,6 +5,8 @@ on:
     - cron: "0 7,13,18,21 * * *"   # noticias, varias veces al dia (UTC)
     - cron: "*/15 13-21 * * 1-5"   # sesion de mercado, dias laborables (UTC)
     - cron: "30 21 * * 1-5"        # cartera de papel, tras el cierre (UTC)
+    - cron: "45 21 * * 1-5"        # candidatos de medio plazo, tras el cierre (UTC)
+    - cron: "*/15 * * * *"         # Telegram: tus mensajes y seguimiento de posiciones reales
   workflow_dispatch:
 
 permissions:
@@ -19,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      JOB: ${{ github.event.schedule == '*/15 13-21 * * 1-5' && 'session' || (github.event.schedule == '30 21 * * 1-5' && 'paper') || 'news' }}
+      JOB: ${{ github.event.schedule == '*/15 13-21 * * 1-5' && 'session' || github.event.schedule == '30 21 * * 1-5' && 'paper' || github.event.schedule == '45 21 * * 1-5' && 'candidates' || github.event.schedule == '*/15 * * * *' && 'telegram' || 'news' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -42,7 +44,7 @@ jobs:
         run: python3 scripts/trader_bot.py "$JOB"
 
       - name: Publicar panel (docs/data)
-        if: success() && (env.JOB == 'news' || env.JOB == 'paper')
+        if: success() && (env.JOB == 'news' || env.JOB == 'paper' || env.JOB == 'candidates')
         run: |
           git config user.name "trader-bot"
           git config user.email "trader-bot@users.noreply.github.com"

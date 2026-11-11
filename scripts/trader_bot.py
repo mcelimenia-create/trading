@@ -18,7 +18,10 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import candidates
 import paper_trader
+import real_positions
+import telegram_io
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS_DIR = ROOT / "skills"
@@ -26,8 +29,12 @@ TRADER_DIR = ROOT / "trader"
 CONFIG_FILE = ROOT / "config" / "watchlist.json"
 ENV_FILE = ROOT / ".env"
 PAPER_FILE = TRADER_DIR / "paper.json"
+REAL_FILE = TRADER_DIR / "real.json"
+OFFSET_FILE = TRADER_DIR / "telegram_offset.json"
+CANDIDATE_CONFIG = ROOT / "config" / "candidates.json"
 DOCS_DATA_DIR = ROOT / "docs" / "data"
-DASHBOARD_JOBS = {"news", "paper"}
+CANDIDATES_PUBLIC_FILE = DOCS_DATA_DIR / "candidates.json"
+DASHBOARD_JOBS = {"news", "paper", "candidates"}
 NEW_YORK = ZoneInfo("America/New_York")
 TELEGRAM_MAX_CHARS = 3500
 HTTP_TIMEOUT_S = 20
@@ -133,7 +140,11 @@ def open_day_trade(tickers, today, notify):
     simulation = run_skill("trader-timemachine/timemachine.py", ["run", "--plan", str(plan_path)], (0,))
     run_skill("trader-alerts/alerts.py", ["add", "--from-plan"], (0,))
     (TRADER_DIR / f"trade-{today}.json").write_text(json.dumps({"ticker": ticker}), encoding="utf-8")
-    notify(f"OPERACION 1 DIA - ENTRADA {ticker}\n\n{entry_text}\n\nPLAN Y SIMULACION\n\n{simulation.stdout}")
+    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    weight = paper_trader.weight_for(plan["entry"], plan["stop"])
+    size_text = (f"Tamano de referencia: {100 * weight:.1f}% de la cartera "
+                 f"(riesgo 2%, maximo 20%). Simulacion, no una orden.")
+    notify(f"OPERACION 1 DIA - ENTRADA {ticker}\n\n{entry_text}\n\n{size_text}\n\nPLAN Y SIMULACION\n\n{simulation.stdout}")
 
 
 def watch_day_trade(ticker, notify):
@@ -156,6 +167,39 @@ def paper_job(notify):
     paper_trader.paper_job(notify, load_config()["tickers"], PAPER_FILE)
 
 
+def load_json(path, default):
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else default
+
+
+def telegram_job(notify, token, chat_id):
+    """Cada 15 minutos: lee tus mensajes, registra posiciones reales y avisa de la regla de salida."""
+    offset = load_json(OFFSET_FILE, {"offset": 0})["offset"]
+    updates = telegram_io.get_updates(token, offset)
+    state = load_json(REAL_FILE, real_positions.empty_real_state())
+    replies = []
+    for update_id, text in telegram_io.text_messages(updates, chat_id):
+        state, reply = real_positions.handle_command(state, text, real_fetch)
+        replies.append(reply)
+        OFFSET_FILE.write_text(json.dumps({"offset": update_id + 1}), encoding="utf-8")
+    state, alerts = real_positions.monitor(state, real_fetch)
+    REAL_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    for reply in replies:
+        notify(reply)
+    if alerts:
+        notify("\n".join(alerts))
+    if updates:
+        OFFSET_FILE.write_text(json.dumps({"offset": max(u["update_id"] for u in updates) + 1}), encoding="utf-8")
+
+
+def real_fetch(symbol):
+    return paper_trader.fetch_bars(symbol)
+
+
+def candidates_job(notify):
+    tickers = load_json(CANDIDATE_CONFIG, {"tickers": []})["tickers"]
+    candidates.candidates_job(notify, tickers, CANDIDATES_PUBLIC_FILE)
+
+
 def publish_dashboard(job):
     """Copia el estado de papel y la hora de la ultima ejecucion a docs/data (panel de GitHub Pages)."""
     DOCS_DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -168,9 +212,12 @@ def publish_dashboard(job):
 
 
 def main(argv):
-    jobs = {"news": news_job, "session": session_job, "paper": paper_job}
+    jobs = {
+        "news": news_job, "session": session_job, "paper": paper_job,
+        "candidates": candidates_job, "telegram": None,
+    }
     if len(argv) != 2 or argv[1] not in jobs:
-        print("Uso: trader_bot.py news|session|paper", file=sys.stderr)
+        print("Uso: trader_bot.py news|session|paper|candidates|telegram", file=sys.stderr)
         return 2
     env = {**load_env(ENV_FILE), **os.environ}
     token = env.get("TELEGRAM_BOT_TOKEN")
@@ -183,7 +230,10 @@ def main(argv):
     def notify(text):
         send_telegram(token, chat_id, text)
 
-    jobs[argv[1]](notify)
+    if argv[1] == "telegram":
+        telegram_job(notify, token, chat_id)
+    else:
+        jobs[argv[1]](notify)
     if argv[1] in DASHBOARD_JOBS:
         publish_dashboard(argv[1])
     return 0

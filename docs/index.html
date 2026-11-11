@@ -39,6 +39,9 @@
   <h2>Resumen de la cartera de papel</h2>
   <div class="grid" id="summary"></div>
 
+  <h2>Candidatos de medio plazo (regla de precio, hoy)</h2>
+  <div class="table-wrap"><table id="cands"></table></div>
+
   <h2>Señales pendientes de entrada</h2>
   <div class="table-wrap"><table id="pending"></table></div>
 
@@ -98,6 +101,11 @@ async function load() {
     ];
     document.getElementById("summary").innerHTML = summary.map(([l, v]) =>
       `<div class="card"><div class="label">${l}</div><div class="value">${v}</div></div>`).join("");
+
+    const cands = await getJSON("data/candidates.json").catch(() => ({ candidates: [] }));
+    table(document.getElementById("cands"), ["Valor", "Día", "Cierre", "Stop de referencia", "Ingresos", "Invalida si"],
+      (cands.candidates || []).map((c) => [esc(c.symbol), esc(c.date), c.close.toFixed(2), c.stop.toFixed(2), esc(c.growth), esc(c.invalidation)]),
+      "Hoy no hay candidatos.");
 
     table(document.getElementById("pending"), ["Valor", "Día de señal", "Cierre", "Stop orientativo"],
       (state.pending || []).map((p) => [esc(p.symbol), esc(p.signal_date), p.signal_close.toFixed(2), p.stop_estimate.toFixed(2)]),
