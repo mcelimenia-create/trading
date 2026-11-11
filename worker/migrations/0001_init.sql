@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS state (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  json TEXT NOT NULL
+);

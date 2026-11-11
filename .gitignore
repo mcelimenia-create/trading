@@ -1,2 +1,4 @@
 .env
 trader/
+.wrangler/
+worker/node_modules/

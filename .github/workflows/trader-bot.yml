@@ -8,7 +8,7 @@ on:
     - cron: "35 21 * * 1-5"        # cartera de papel, tras el cierre (UTC)
     - cron: "50 21 * * 1-5"        # candidatos de medio plazo, tras el cierre (UTC)
     - cron: "0 22 * * 5"           # escaner de EEUU, cada viernes (UTC)
-    - cron: "1,6,11,16,21,26,31,36,41,46,51,56 * * * *"   # Telegram cada 5 min (minutos que no coinciden con las demas)
+    # Telegram: lo atiende el Worker de Cloudflare (webhook); el cron de GitHub se quito.
   workflow_dispatch:
     inputs:
       job:
