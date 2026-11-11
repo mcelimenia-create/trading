@@ -35,6 +35,9 @@ CONFIG_FILE = ROOT / "config" / "watchlist.json"
 ENV_FILE = ROOT / ".env"
 PAPER_FILE = TRADER_DIR / "paper.json"
 REAL_FILE = TRADER_DIR / "real.json"
+ALERTS_RULES = TRADER_DIR / "alerts.json"
+ALERTS_STATE = TRADER_DIR / "alerts-state.json"
+PRICES_FILE = TRADER_DIR / "prices.json"
 EARNINGS_FILE = TRADER_DIR / "earnings_alerted.json"
 WORKER_STATE_URL = "https://trading-bot.mcelimen-ia.workers.dev/state"
 WORKER_AUDIENCE = "trading-bot-worker"
@@ -161,7 +164,8 @@ def open_day_trade(tickers, today, notify):
     plan_path = TRADER_DIR / "plan.json"
     run_skill("trader-exit/exit.py", ["plan", "--from", str(entry_path), "--write", str(plan_path)], (0,))
     simulation = run_skill("trader-timemachine/timemachine.py", ["run", "--plan", str(plan_path)], (0,))
-    run_skill("trader-alerts/alerts.py", ["add", "--from-plan"], (0,))
+    run_skill("trader-alerts/alerts.py", ["add", "--from-plan", "--plan", str(plan_path),
+                                          "--rules", str(ALERTS_RULES), "--state", str(ALERTS_STATE)], (0,))
     (TRADER_DIR / f"trade-{today}.json").write_text(json.dumps({"ticker": ticker}), encoding="utf-8")
     plan = json.loads(plan_path.read_text(encoding="utf-8"))
     weight = paper_trader.weight_for(plan["entry"], plan["stop"])
@@ -171,8 +175,10 @@ def open_day_trade(tickers, today, notify):
 
 
 def watch_day_trade(ticker, notify):
-    run_skill("trader-alerts/alerts.py", ["quote", ticker, "--write"], (0,))
-    result = run_skill("trader-alerts/alerts.py", ["check"], ALERTS_OK_CODES)
+    run_skill("trader-alerts/alerts.py", ["quote", ticker, "--write", str(PRICES_FILE)], (0,))
+    result = run_skill("trader-alerts/alerts.py", ["check", "--rules", str(ALERTS_RULES),
+                                                   "--state", str(ALERTS_STATE), "--prices-out", str(PRICES_FILE)],
+                       ALERTS_OK_CODES)
     if result.returncode == 0:
         notify(f"OPERACION 1 DIA - SALIDA / AVISO {ticker}\n\n{result.stdout}")
 
