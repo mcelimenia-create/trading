@@ -1,5 +1,24 @@
 {
-  "pending": [],
+  "pending": [
+    {
+      "symbol": "AAPL",
+      "signal_date": "2026-11-11",
+      "signal_close": 355.6300048828125,
+      "stop_estimate": 336.4671412876674
+    },
+    {
+      "symbol": "KO",
+      "signal_date": "2026-11-11",
+      "signal_close": 97.56999969482422,
+      "stop_estimate": 93.69000244140625
+    },
+    {
+      "symbol": "DIS",
+      "signal_date": "2026-11-11",
+      "signal_close": 119.6500015258789,
+      "stop_estimate": 114.56571633475167
+    }
+  ],
   "positions": [],
   "closed": []
 }
