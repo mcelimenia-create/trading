@@ -36,6 +36,7 @@ DOCS_DATA_DIR = ROOT / "docs" / "data"
 CANDIDATES_PUBLIC_FILE = DOCS_DATA_DIR / "candidates.json"
 DASHBOARD_JOBS = {"news", "paper", "candidates"}
 NEW_YORK = ZoneInfo("America/New_York")
+NEWS_PUBLIC_MAX = 40
 TELEGRAM_MAX_CHARS = 3500
 HTTP_TIMEOUT_S = 20
 SKILL_TIMEOUT_S = 300
@@ -103,12 +104,23 @@ def send_telegram(token, chat_id, text):
             raise RuntimeError(f"Telegram devolvio HTTP {error.code}") from None
 
 
+def write_public_news(items):
+    """Ultimas noticias para el panel (titulares publicos, sin datos personales)."""
+    DOCS_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    keep = ("ticker", "title", "link", "source", "time", "important")
+    rows = [{key: item.get(key) for key in keep} for item in items[:NEWS_PUBLIC_MAX]]
+    doc = {"generated": datetime.now(ZoneInfo("UTC")).isoformat(timespec="minutes"), "items": rows}
+    (DOCS_DATA_DIR / "news.json").write_text(json.dumps(doc, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
 def news_job(notify):
     tickers = load_config()["tickers"]
     result = run_skill("trader-news/news.py", ["--tickers", *tickers, "--hours", "24", "--json"], NEWS_OK_CODES)
     if not result.stdout.strip():
         raise RuntimeError(f"news.py no devolvio datos: {result.stderr.strip()[-800:]}")
-    fresh = [item for item in json.loads(result.stdout)["items"] if item.get("new")]
+    items = json.loads(result.stdout)["items"]
+    write_public_news(items)
+    fresh = [item for item in items if item.get("new")]
     if not fresh:
         print("Sin noticias nuevas")
         return

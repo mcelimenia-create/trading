@@ -3,66 +3,213 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#05070b">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Trading bot">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <title>Panel del bot de trading</title>
 <style>
-  :root { --bg:#f6f7f9; --card:#fff; --text:#1d2330; --muted:#6b7280; --good:#15803d; --bad:#b91c1c; --line:#e5e7eb; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#0f1218; --card:#171c25; --text:#e6e9ef; --muted:#9aa3b2; --good:#4ade80; --bad:#f87171; --line:#262d3a; }
+  :root {
+    --bg: #05070b;
+    --text: #f5f5f7;
+    --muted: #8e8e93;
+    --pos: #30d158;
+    --neg: #ff453a;
+    --warn: #ff9f0a;
+    --accent: #0a84ff;
+    --glass: rgba(255, 255, 255, 0.06);
+    --glass-strong: rgba(255, 255, 255, 0.10);
+    --line: rgba(255, 255, 255, 0.10);
+    --radius: 20px;
   }
-  body { margin:0; font-family: -apple-system, system-ui, sans-serif; background:var(--bg); color:var(--text); }
-  main { max-width: 960px; margin: 0 auto; padding: 16px; }
-  h1 { font-size: 1.4rem; margin: 8px 0 4px; }
-  h2 { font-size: 1.05rem; margin: 24px 0 8px; }
-  .muted { color: var(--muted); font-size: .9rem; }
-  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin-top:12px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; }
-  .label { color: var(--muted); font-size:.8rem; }
-  .value { font-size:1.2rem; font-weight:600; margin-top:4px; }
-  table { width:100%; border-collapse: collapse; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; font-size:.9rem; }
-  th, td { padding:8px 10px; text-align:left; border-bottom:1px solid var(--line); }
-  th { color: var(--muted); font-weight:500; }
-  .pos { color: var(--good); } .neg { color: var(--bad); }
-  .empty { padding:12px; color: var(--muted); }
-  .warn { border-left:4px solid #d97706; padding:8px 12px; background:var(--card); border-radius:6px; font-size:.9rem; }
-  .table-wrap { overflow-x:auto; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(900px 600px at 10% -10%, rgba(10, 132, 255, 0.22), transparent 60%),
+      radial-gradient(800px 600px at 110% 10%, rgba(48, 209, 88, 0.16), transparent 60%),
+      radial-gradient(900px 700px at 50% 120%, rgba(255, 69, 58, 0.14), transparent 60%),
+      var(--bg);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 48px; }
+  .glass {
+    background: var(--glass);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  .glass { position: relative; transition: transform .35s cubic-bezier(.2,.8,.2,1), border-color .3s, box-shadow .3s; }
+  .glass::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0;
+    background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, 0.13), transparent 70%);
+    transition: opacity .3s;
+  }
+  .glass > * { position: relative; z-index: 1; }
+  .tab { transition: color .2s, background .2s; }
+  .tab:hover { color: var(--text); }
+  tbody tr { transition: background .2s; }
+  tbody tr:hover td { background: rgba(255, 255, 255, 0.05); }
+  .kpi { transition: transform .25s ease-out, border-color .3s, box-shadow .3s; transform-style: preserve-3d; will-change: transform; }
+  @media (hover: hover) {
+    .glass:hover::before { opacity: 1; }
+    .glass:hover { border-color: rgba(255, 255, 255, 0.2); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1); transform: translateY(-2px); }
+    .tabs:hover { transform: none; }
+    .kpi:hover { transform: none; }
+    .news-item:hover { transform: translateY(-2px); }
+  }
+  header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -0.02em; margin: 0; }
+  .sub { color: var(--muted); font-size: .85rem; margin-top: 4px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font-size: .75rem; color: var(--muted); padding: 5px 10px; border-radius: 999px;
+    background: var(--glass-strong); border: 1px solid var(--line); white-space: nowrap;
+  }
+  .live { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--pos); box-shadow: 0 0 8px var(--pos); margin-right: 6px; }
+
+  .tabs {
+    display: flex; gap: 4px; padding: 4px; margin: 0 0 18px;
+    background: var(--glass-strong); border: 1px solid var(--line); border-radius: 14px;
+    position: sticky; top: 8px; z-index: 5;
+    backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  }
+  .tab {
+    flex: 1; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: .9rem; font-weight: 600;
+    padding: 9px 6px; border-radius: 10px; cursor: pointer;
+  }
+  .tab[aria-selected="true"] { background: rgba(255, 255, 255, 0.16); color: var(--text); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3); }
+  .view[hidden] { display: none; }
+
+  h2 { font-size: 1rem; font-weight: 600; margin: 26px 0 10px; color: var(--text); }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .kpi { padding: 16px; }
+  .label { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
+  .value { font-size: 1.55rem; font-weight: 700; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .pos { color: var(--pos); } .neg { color: var(--neg); } .warn { color: var(--warn); }
+
+  .panel { padding: 16px; }
+  .panel-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+  .panel-title span { color: var(--muted); font-size: .8rem; }
+  .chart { width: 100%; height: auto; display: block; }
+  .two { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12px; }
+  @media (max-width: 760px) { .two { grid-template-columns: 1fr; } }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; font-variant-numeric: tabular-nums; }
+  th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }
+  tr:last-child td { border-bottom: 0; }
+  .badge {
+    display: inline-block; font-size: .72rem; font-weight: 600; padding: 3px 8px; border-radius: 999px;
+    background: rgba(10, 132, 255, 0.18); color: #64b5ff;
+  }
+  .badge.pos { background: rgba(48, 209, 88, 0.16); }
+  .badge.neg { background: rgba(255, 69, 58, 0.16); }
+  .empty { padding: 16px 8px; color: var(--muted); }
+
+  .note { color: var(--muted); font-size: .85rem; line-height: 1.5; }
+  .warnbox { border-left: 3px solid var(--warn); padding: 10px 14px; font-size: .85rem; color: var(--muted); }
+  .cmds { margin: 10px 0 0; padding-left: 18px; line-height: 1.8; }
+  code { background: var(--glass-strong); padding: 2px 6px; border-radius: 6px; font-size: .85rem; }
+
+  .news { display: grid; gap: 10px; }
+  .news-item { padding: 14px 16px; display: block; color: inherit; text-decoration: none; transition: background .2s; }
+  .news-item:hover { background: var(--glass-strong); }
+  .news-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--muted); font-size: .78rem; }
+  .news-title { font-size: .98rem; font-weight: 600; margin: 8px 0 0; line-height: 1.35; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn); display: inline-block; }
+  footer { margin-top: 28px; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Panel del bot de trading</h1>
-  <p class="muted">Cartera de papel: simulación sin dinero real. No es una recomendación personal de compra ni de venta.</p>
-  <p class="warn">Los resultados son simulados y el pasado no garantiza nada. Si la regla pierde, la tabla lo muestra igual.</p>
+  <header>
+    <div>
+      <h1>Panel del bot</h1>
+      <div class="sub">Simulación y seguimiento. No es una recomendación personal de compra ni de venta.</div>
+    </div>
+    <div class="chips" id="status"><span class="chip">Cargando…</span></div>
+  </header>
 
-  <h2>Estado del bot</h2>
-  <div id="status" class="card muted">Cargando…</div>
+  <nav class="tabs glass" role="tablist">
+    <button class="tab" role="tab" data-view="simulado" aria-selected="true">Simulado</button>
+    <button class="tab" role="tab" data-view="reales" aria-selected="false">Operaciones reales</button>
+    <button class="tab" role="tab" data-view="noticias" aria-selected="false">Noticias</button>
+  </nav>
 
-  <h2>Resumen de la cartera de papel</h2>
-  <div class="grid" id="summary"></div>
+  <!-- SIMULADO -->
+  <section class="view" id="view-simulado">
+    <div class="kpis" id="kpis"></div>
 
-  <h2>Candidatos de medio plazo (regla de precio, hoy)</h2>
-  <div class="table-wrap"><table id="cands"></table></div>
+    <h2>Curva de la cartera simulada</h2>
+    <div class="glass panel">
+      <div class="panel-title"><strong>Suma de resultados por operación</strong><span id="curveNote"></span></div>
+      <div id="curve"></div>
+    </div>
 
-  <h2>Señales pendientes de entrada</h2>
-  <div class="table-wrap"><table id="pending"></table></div>
+    <h2>Candidatos de medio plazo</h2>
+    <div class="glass panel"><div class="table-wrap"><table id="cands"></table></div></div>
 
-  <h2>Posiciones abiertas</h2>
-  <div class="table-wrap"><table id="open"></table></div>
+    <div class="two">
+      <div>
+        <h2>Señales pendientes</h2>
+        <div class="glass panel"><div class="table-wrap"><table id="pending"></table></div></div>
+      </div>
+      <div>
+        <h2>Posiciones abiertas</h2>
+        <div class="glass panel"><div class="table-wrap"><table id="open"></table></div></div>
+      </div>
+    </div>
 
-  <h2>Operaciones cerradas</h2>
-  <div class="table-wrap"><table id="closed"></table></div>
+    <h2>Operaciones cerradas</h2>
+    <div class="glass panel"><div class="table-wrap"><table id="closed"></table></div></div>
+  </section>
 
-  <p class="muted" id="updated"></p>
+  <!-- OPERACIONES REALES -->
+  <section class="view" id="view-reales" hidden>
+    <div class="glass panel">
+      <div class="panel-title"><strong>Tus posiciones reales</strong><span>Privadas</span></div>
+      <p class="note">Este panel es público, así que tus posiciones reales no se publican aquí. Gestiónalas desde Telegram:</p>
+      <ul class="cmds">
+        <li><code>entre TICKER PRECIO [ACCIONES]</code>: registrar una entrada</li>
+        <li><code>sali TICKER PRECIO</code>: registrar una salida</li>
+        <li><code>posiciones</code>: ver las posiciones abiertas</li>
+      </ul>
+    </div>
+    <div class="warnbox" style="margin-top:12px">El bot te avisa por Telegram cuando se cumple la regla de salida de una posición real. No compra ni vende nada.</div>
+  </section>
+
+  <!-- NOTICIAS -->
+  <section class="view" id="view-noticias" hidden>
+    <h2>Últimas noticias de la lista vigilada</h2>
+    <div class="news" id="news"></div>
+  </section>
+
+  <footer class="note">
+    Resultados simulados: el pasado no garantiza nada. Si la regla pierde, la tabla lo muestra igual.
+    <div id="updated" style="margin-top:6px"></div>
+  </footer>
 </main>
 
 <script>
 const fmtPct = (x) => (x * 100).toFixed(2) + "%";
+const signed = (x) => (x >= 0 ? "+" : "") + (x * 100).toFixed(2) + "%";
 const cls = (x) => (x >= 0 ? "pos" : "neg");
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 function table(el, headers, rows, emptyText) {
   if (!rows.length) { el.innerHTML = `<tr><td class="empty">${emptyText}</td></tr>`; return; }
-  el.innerHTML = "<tr>" + headers.map((h) => `<th>${h}</th>`).join("") + "</tr>" +
-    rows.map((r) => "<tr>" + r.map((c) => `<td>${c}</td>`).join("") + "</tr>").join("");
+  el.innerHTML = "<thead><tr>" + headers.map((h) => `<th>${h}</th>`).join("") + "</tr></thead><tbody>" +
+    rows.map((r) => "<tr>" + r.map((c) => `<td>${c}</td>`).join("") + "</tr>").join("") + "</tbody>";
 }
 
 function stats(closed) {
@@ -70,9 +217,82 @@ function stats(closed) {
   const rets = closed.map((c) => c.ret);
   const wins = rets.filter((r) => r > 0);
   const losses = rets.filter((r) => r <= 0);
-  const factor = losses.length ? wins.reduce((a, b) => a + b, 0) / Math.abs(losses.reduce((a, b) => a + b, 0)) : null;
+  const lossSum = Math.abs(losses.reduce((a, b) => a + b, 0));
+  const factor = lossSum ? wins.reduce((a, b) => a + b, 0) / lossSum : null;
   const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
-  return { n: rets.length, hit: wins.length / rets.length, mean, factor };
+  return { n: rets.length, hit: wins.length / rets.length, mean, factor, total: rets.reduce((a, b) => a + b, 0) };
+}
+
+function curveSVG(closed) {
+  if (closed.length < 2) return `<p class="empty">Hará falta más de una operación cerrada para dibujar la curva.</p>`;
+  const sorted = closed.slice().sort((a, b) => (a.exit_date > b.exit_date ? 1 : -1));
+  let acc = 0;
+  const points = [0, ...sorted.map((c) => (acc += c.ret * 100))];
+  const W = 600, H = 180, P = 14;
+  const min = Math.min(0, ...points), max = Math.max(0, ...points);
+  const span = max - min || 1;
+  const x = (i) => P + (i * (W - 2 * P)) / (points.length - 1);
+  const y = (v) => P + (H - 2 * P) * (1 - (v - min) / span);
+  const line = points.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const area = `${line} L${x(points.length - 1).toFixed(1)},${y(min).toFixed(1)} L${x(0).toFixed(1)},${y(min).toFixed(1)} Z`;
+  const color = points[points.length - 1] >= 0 ? "#30d158" : "#ff453a";
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Curva de resultados">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${color}" stop-opacity=".35"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>
+    <line x1="${P}" x2="${W - P}" y1="${y(0)}" y2="${y(0)}" stroke="rgba(255,255,255,.18)" stroke-dasharray="4 4"/>
+    <path d="${area}" fill="url(#g)"/>
+    <path d="${line}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+  </svg>`;
+}
+
+function renderSimulado(state, cands) {
+  const closed = state.closed || [];
+  const s = stats(closed);
+  const kpis = [
+    ["Operaciones cerradas", s ? s.n : 0],
+    ["Acierto", s ? fmtPct(s.hit) : "-", ""],
+    ["Media por operación", s ? `<span class="${cls(s.mean)}">${signed(s.mean)}</span>` : "-"],
+    ["Factor de beneficio", s && s.factor !== null ? s.factor.toFixed(2) : "-"],
+    ["Posiciones abiertas", (state.positions || []).length],
+    ["Señales pendientes", (state.pending || []).length],
+  ];
+  document.getElementById("kpis").innerHTML = kpis.map(([l, v]) =>
+    `<div class="glass kpi"><div class="label">${l}</div><div class="value">${v}</div></div>`).join("");
+
+  document.getElementById("curve").innerHTML = curveSVG(closed);
+  document.getElementById("curveNote").textContent = s ? `Total: ${signed(s.total / 1)}` : "";
+
+  table(document.getElementById("cands"), ["Valor", "Día", "Cierre", "Stop de referencia", "Ingresos", "Invalida si"],
+    (cands.candidates || []).map((c) => [`<span class="badge">${esc(c.symbol)}</span>`, esc(c.date), c.close.toFixed(2), c.stop.toFixed(2), esc(c.growth), esc(c.invalidation)]),
+    "Hoy no hay candidatos.");
+
+  table(document.getElementById("pending"), ["Valor", "Día", "Cierre", "Stop"],
+    (state.pending || []).map((p) => [esc(p.symbol), esc(p.signal_date), p.signal_close.toFixed(2), p.stop_estimate.toFixed(2)]),
+    "No hay señales pendientes.");
+
+  table(document.getElementById("open"), ["Valor", "Entrada", "Precio", "Stop", "Peso"],
+    (state.positions || []).map((p) => [esc(p.symbol), esc(p.entry_date), p.entry.toFixed(2), p.stop.toFixed(2), fmtPct(p.weight)]),
+    "No hay posiciones abiertas.");
+
+  table(document.getElementById("closed"), ["Valor", "Entrada", "Salida", "Motivo", "Precio salida", "Resultado"],
+    closed.slice().reverse().map((c) => [esc(c.symbol), esc(c.entry_date), esc(c.exit_date), esc(c.reason),
+      c.exit.toFixed(2), `<span class="badge ${cls(c.ret)}">${signed(c.ret)}</span>`]),
+    "Todavía no hay operaciones cerradas.");
+}
+
+function renderNews(doc) {
+  const items = doc.items || [];
+  const el = document.getElementById("news");
+  if (!items.length) { el.innerHTML = `<div class="glass panel empty">Todavía no hay noticias publicadas.</div>`; return; }
+  el.innerHTML = items.map((n) => `
+    <a class="glass news-item" href="${esc(n.link)}" target="_blank" rel="noopener noreferrer">
+      <div class="news-meta">
+        <span class="badge">${esc(n.ticker)}</span>
+        ${n.important ? '<span class="dot" title="Relevante"></span>' : ""}
+        <span>${esc(n.source)}</span><span>·</span><span>${esc((n.time || "").slice(0, 16).replace("T", " "))}</span>
+      </div>
+      <div class="news-title">${esc(n.title)}</div>
+    </a>`).join("");
 }
 
 async function getJSON(path) {
@@ -84,48 +304,52 @@ async function getJSON(path) {
 async function load() {
   try {
     const status = await getJSON("data/status.json").catch(() => ({}));
-    const jobs = Object.entries(status).map(([job, at]) => `${esc(job)}: ${esc(at)}`);
-    document.getElementById("status").innerHTML = jobs.length
-      ? "Última ejecución por tipo<br>" + jobs.join("<br>")
-      : "Todavía no hay ejecuciones registradas.";
+    const chips = Object.entries(status).map(([job, at]) => `<span class="chip">${esc(job)} · ${esc(at)}</span>`);
+    document.getElementById("status").innerHTML =
+      `<span class="chip"><span class="live"></span>En marcha</span>` + (chips.join("") || `<span class="chip">Sin ejecuciones aún</span>`);
 
     const state = await getJSON("data/paper.json").catch(() => ({ pending: [], positions: [], closed: [] }));
-    const s = stats(state.closed || []);
-    const summary = [
-      ["Operaciones cerradas", s ? s.n : 0],
-      ["Acierto", s ? fmtPct(s.hit) : "-"],
-      ["Media por operación", s ? `<span class="${cls(s.mean)}">${fmtPct(s.mean)}</span>` : "-"],
-      ["Factor de beneficio", s && s.factor !== null ? s.factor.toFixed(2) : "-"],
-      ["Posiciones abiertas", (state.positions || []).length],
-      ["Señales pendientes", (state.pending || []).length],
-    ];
-    document.getElementById("summary").innerHTML = summary.map(([l, v]) =>
-      `<div class="card"><div class="label">${l}</div><div class="value">${v}</div></div>`).join("");
-
     const cands = await getJSON("data/candidates.json").catch(() => ({ candidates: [] }));
-    table(document.getElementById("cands"), ["Valor", "Día", "Cierre", "Stop de referencia", "Ingresos", "Invalida si"],
-      (cands.candidates || []).map((c) => [esc(c.symbol), esc(c.date), c.close.toFixed(2), c.stop.toFixed(2), esc(c.growth), esc(c.invalidation)]),
-      "Hoy no hay candidatos.");
+    renderSimulado(state, cands);
 
-    table(document.getElementById("pending"), ["Valor", "Día de señal", "Cierre", "Stop orientativo"],
-      (state.pending || []).map((p) => [esc(p.symbol), esc(p.signal_date), p.signal_close.toFixed(2), p.stop_estimate.toFixed(2)]),
-      "No hay señales pendientes.");
-
-    table(document.getElementById("open"), ["Valor", "Entrada", "Precio entrada", "Stop", "Tamaño de referencia"],
-      (state.positions || []).map((p) => [esc(p.symbol), esc(p.entry_date), p.entry.toFixed(2), p.stop.toFixed(2), fmtPct(p.weight)]),
-      "No hay posiciones abiertas.");
-
-    table(document.getElementById("closed"), ["Valor", "Entrada", "Salida", "Motivo", "Precio salida", "Resultado"],
-      (state.closed || []).slice().reverse().map((c) => [esc(c.symbol), esc(c.entry_date), esc(c.exit_date), esc(c.reason),
-        c.exit.toFixed(2), `<span class="${cls(c.ret)}">${fmtPct(c.ret)}</span>`]),
-      "Todavía no hay operaciones cerradas.");
+    const news = await getJSON("data/news.json").catch(() => ({ items: [] }));
+    renderNews(news);
 
     document.getElementById("updated").textContent = "Página cargada: " + new Date().toLocaleString("es-ES");
   } catch (err) {
-    document.getElementById("status").textContent = "No se pudieron cargar los datos: " + err.message;
+    document.getElementById("status").innerHTML = `<span class="chip neg">Error: ${esc(err.message)}</span>`;
   }
 }
+
+function trackPointer(e) {
+  const card = e.target.closest ? e.target.closest(".glass") : null;
+  if (!card || e.pointerType === "touch") return;
+  const r = card.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  card.style.setProperty("--mx", x + "px");
+  card.style.setProperty("--my", y + "px");
+  if (card.classList.contains("kpi")) {
+    const rx = (y / r.height - 0.5) * -10, ry = (x / r.width - 0.5) * 10;
+    card.style.transform = `perspective(600px) rotateX(${rx.toFixed(2)}deg) rotateY(${ry.toFixed(2)}deg) translateY(-3px)`;
+  }
+}
+function releaseKpi(e) {
+  const kpi = e.target.closest ? e.target.closest(".kpi") : null;
+  if (kpi && !(e.relatedTarget && kpi.contains(e.relatedTarget))) kpi.style.transform = "";
+}
+document.addEventListener("pointermove", trackPointer);
+document.addEventListener("pointerout", releaseKpi);
+
+function showView(name) {
+  document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-selected", String(t.dataset.view === name)));
+  document.querySelectorAll(".view").forEach((v) => { v.hidden = v.id !== "view-" + name; });
+}
+document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => showView(t.dataset.view)));
+
 load();
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
 </script>
 </body>
 </html>

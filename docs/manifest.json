@@ -1,0 +1,14 @@
+{
+  "name": "Panel del bot de trading",
+  "short_name": "Trading bot",
+  "description": "Estado del bot, cartera de papel y candidatos de medio plazo.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f7f9",
+  "theme_color": "#1d2330",
+  "lang": "es",
+  "icons": [
+    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}
+  ]
+}
