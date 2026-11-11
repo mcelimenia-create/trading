@@ -47,17 +47,10 @@ restore() {
   echo "Estado restaurado desde $head"
 }
 
-save() {
-  require_key
-  if [ ! -d "$STATE_DIR/trader" ]; then
-    echo "No hay estado que guardar (la restauracion no se completo)"
-    return 0
-  fi
+# Crea un commit sobre la rama state actual y lo sube. Devuelve error si otro run subio antes.
+push_state() {
   local parent tree commit
   parent="$(remote_head)"
-  mkdir -p "$PACK_DIR"
-  tar -czf - -C "$STATE_DIR" trader | "${CIPHER[@]}" -salt -out "$PACK_DIR/$FILE"
-
   export GIT_DIR="$(git rev-parse --absolute-git-dir)"
   export GIT_INDEX_FILE="$(mktemp -u)"
   export GIT_AUTHOR_NAME="trader-bot" GIT_AUTHOR_EMAIL="trader-bot@users.noreply.github.com"
@@ -70,6 +63,25 @@ save() {
   commit="$(git commit-tree "$tree" ${parent:+-p "$parent"} -m "chore: estado cifrado del bot $(date -u +%Y-%m-%dT%H:%MZ)")"
   git push --quiet origin "$commit:refs/heads/$BRANCH"
   echo "Estado guardado en $BRANCH: $commit"
+}
+
+save() {
+  require_key
+  if [ ! -d "$STATE_DIR/trader" ]; then
+    echo "No hay estado que guardar (la restauracion no se completo)"
+    return 0
+  fi
+  mkdir -p "$PACK_DIR"
+  tar -czf - -C "$STATE_DIR" trader | "${CIPHER[@]}" -salt -out "$PACK_DIR/$FILE"
+  for attempt in 1 2 3; do
+    if push_state; then
+      return 0
+    fi
+    echo "Push del estado rechazado (intento $attempt): reintento sobre la rama actual" >&2
+    sleep 5
+  done
+  echo "No pude guardar el estado en $BRANCH" >&2
+  return 1
 }
 
 case "${1:-}" in
