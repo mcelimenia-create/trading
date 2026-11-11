@@ -1,0 +1,46 @@
+name: trader-bot
+
+on:
+  schedule:
+    - cron: "0 7,13,18,21 * * *"   # noticias, varias veces al dia (UTC)
+    - cron: "*/15 13-21 * * 1-5"   # sesion de mercado, dias laborables (UTC)
+    - cron: "30 21 * * 1-5"        # swing, tras el cierre (UTC)
+  workflow_dispatch:
+
+concurrency:
+  group: trader-bot
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      JOB: ${{ github.event.schedule == '*/15 13-21 * * 1-5' && 'session' || (github.event.schedule == '30 21 * * 1-5' && 'swing') || 'news' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restaurar estado (trader/)
+        uses: actions/cache/restore@v4
+        with:
+          path: trader
+          key: trader-state-${{ github.run_id }}
+          restore-keys: trader-state-
+
+      - name: Ejecutar bot
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+        run: python3 scripts/trader_bot.py "$JOB"
+
+      - name: Guardar estado (trader/)
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: trader
+          key: trader-state-${{ github.run_id }}

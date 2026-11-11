@@ -1,0 +1,4 @@
+{
+  "tickers": ["ORCL", "TSLA", "UBER", "BABA", "NVDA", "AMZN", "MCD", "NFLX", "NKE", "COIN", "GLOB", "ZM", "TEM", "SAN", "JD", "RIOT", "AAPL", "META", "KO", "MSFT", "GOOG", "DIS"],
+  "context": ["SPY", "QQQ", "^VIX"]
+}
