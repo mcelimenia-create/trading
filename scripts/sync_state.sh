@@ -47,10 +47,17 @@ restore() {
   echo "Estado restaurado desde $head"
 }
 
+# Huella del contenido de trader/ (sin fechas: solo cambia si cambian los datos).
+content_digest() {
+  (cd "$STATE_DIR" && find trader -type f | LC_ALL=C sort | while read -r f; do sha256sum "$f"; done) \
+    | sha256sum | cut -d' ' -f1
+}
+
 # Crea un commit sobre la rama state actual y lo sube. Devuelve error si otro run subio antes.
 push_state() {
-  local parent tree commit
+  local parent tree commit digest
   parent="$(remote_head)" || return 1
+  digest="$(content_digest)"
   export GIT_DIR="$(git rev-parse --absolute-git-dir)"
   export GIT_INDEX_FILE="$(mktemp -u)"
   export GIT_AUTHOR_NAME="trader-bot" GIT_AUTHOR_EMAIL="trader-bot@users.noreply.github.com"
@@ -60,7 +67,7 @@ push_state() {
   fi
   (cd "$PACK_DIR" && GIT_WORK_TREE="$PACK_DIR" git add -A "$FILE")
   tree="$(git write-tree)"
-  commit="$(git commit-tree "$tree" ${parent:+-p "$parent"} -m "chore: estado cifrado del bot $(date -u +%Y-%m-%dT%H:%MZ)")"
+  commit="$(git commit-tree "$tree" ${parent:+-p "$parent"} -m "chore: estado cifrado del bot $(date -u +%Y-%m-%dT%H:%MZ) digest:$digest")"
   git push --quiet origin "$commit:refs/heads/$BRANCH"
   echo "Estado guardado en $BRANCH: $commit"
 }
@@ -70,6 +77,16 @@ save() {
   if [ ! -d "$STATE_DIR/trader" ]; then
     echo "No hay estado que guardar (la restauracion no se completo)"
     return 0
+  fi
+  local head digest last
+  head="$(remote_head)" || return 1
+  digest="$(content_digest)"
+  if [ -n "$head" ]; then
+    last="$(git log -1 --format=%B "$head" | sed -n 's/.*digest:\([0-9a-f]*\).*/\1/p')"
+    if [ "$last" = "$digest" ]; then
+      echo "Estado sin cambios: no guardo"
+      return 0
+    fi
   fi
   mkdir -p "$PACK_DIR"
   tar -czf - -C "$STATE_DIR" trader | "${CIPHER[@]}" -salt -out "$PACK_DIR/$FILE"

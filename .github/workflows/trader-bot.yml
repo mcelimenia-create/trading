@@ -8,7 +8,7 @@ on:
     - cron: "35 21 * * 1-5"        # cartera de papel, tras el cierre (UTC)
     - cron: "50 21 * * 1-5"        # candidatos de medio plazo, tras el cierre (UTC)
     - cron: "0 22 * * 5"           # escaner de EEUU, cada viernes (UTC)
-    - cron: "7,22,37,52 * * * *"   # Telegram: tus mensajes y seguimiento de posiciones reales
+    - cron: "1,6,11,16,21,26,31,36,41,46,51,56 * * * *"   # Telegram cada 5 min (minutos que no coinciden con las demas)
   workflow_dispatch:
     inputs:
       job:
@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      JOB: ${{ github.event_name == 'workflow_dispatch' && inputs.job || github.event.schedule == '*/15 13-21 * * 1-5' && 'session' || github.event.schedule == '35 21 * * 1-5' && 'paper' || github.event.schedule == '50 21 * * 1-5' && 'candidates' || github.event.schedule == '0 22 * * 5' && 'scan' || github.event.schedule == '7,22,37,52 * * * *' && 'telegram' || 'news' }}
+      JOB: ${{ github.event_name == 'workflow_dispatch' && inputs.job || github.event.schedule == '*/15 13-21 * * 1-5' && 'session' || github.event.schedule == '35 21 * * 1-5' && 'paper' || github.event.schedule == '50 21 * * 1-5' && 'candidates' || github.event.schedule == '0 22 * * 5' && 'scan' || github.event.schedule == '1,6,11,16,21,26,31,36,41,46,51,56 * * * *' && 'telegram' || 'news' }}
     steps:
       - uses: actions/checkout@v4
 
