@@ -335,8 +335,13 @@ def main(argv):
         if argv[1] == "telegram":
             try:
                 telegram_job(notify, token, chat_id)
-            finally:
-                publish_real()
+            except Exception:
+                try:
+                    publish_real()
+                except RuntimeError as publish_error:
+                    print(f"Sin publicar posiciones reales: {publish_error}", file=sys.stderr)
+                raise
+            publish_real()
         else:
             jobs[argv[1]](notify)
     except Exception as error:
