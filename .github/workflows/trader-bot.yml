@@ -8,6 +8,12 @@ on:
     - cron: "45 21 * * 1-5"        # candidatos de medio plazo, tras el cierre (UTC)
     - cron: "*/15 * * * *"         # Telegram: tus mensajes y seguimiento de posiciones reales
   workflow_dispatch:
+    inputs:
+      job:
+        description: "Tarea a ejecutar"
+        type: choice
+        default: telegram
+        options: [telegram, news, session, paper, candidates]
 
 permissions:
   contents: write
@@ -21,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      JOB: ${{ github.event.schedule == '*/15 13-21 * * 1-5' && 'session' || github.event.schedule == '30 21 * * 1-5' && 'paper' || github.event.schedule == '45 21 * * 1-5' && 'candidates' || github.event.schedule == '*/15 * * * *' && 'telegram' || 'news' }}
+      JOB: ${{ github.event_name == 'workflow_dispatch' && inputs.job || github.event.schedule == '*/15 13-21 * * 1-5' && 'session' || github.event.schedule == '30 21 * * 1-5' && 'paper' || github.event.schedule == '45 21 * * 1-5' && 'candidates' || github.event.schedule == '*/15 * * * *' && 'telegram' || 'news' }}
     steps:
       - uses: actions/checkout@v4
 
