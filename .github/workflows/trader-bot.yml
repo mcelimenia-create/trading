@@ -42,7 +42,7 @@ jobs:
         run: python3 scripts/trader_bot.py "$JOB"
 
       - name: Publicar panel (docs/data)
-        if: always() && (env.JOB == 'news' || env.JOB == 'paper')
+        if: success() && (env.JOB == 'news' || env.JOB == 'paper')
         run: |
           git config user.name "trader-bot"
           git config user.email "trader-bot@users.noreply.github.com"
