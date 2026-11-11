@@ -177,7 +177,9 @@ def telegram_job(notify, token, chat_id):
     updates = telegram_io.get_updates(token, offset)
     state = load_json(REAL_FILE, real_positions.empty_real_state())
     replies = []
-    for update_id, text in telegram_io.text_messages(updates, chat_id):
+    messages = telegram_io.text_messages(updates, chat_id)
+    print(f"telegram: updates={len(updates)} mensajes_del_chat={len(messages)} offset={offset}")
+    for update_id, text in messages:
         state, reply = real_positions.handle_command(state, text, real_fetch)
         replies.append(reply)
         OFFSET_FILE.write_text(json.dumps({"offset": update_id + 1}), encoding="utf-8")
