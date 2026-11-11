@@ -38,5 +38,6 @@ export async function verifyActionsToken(token) {
   const key = await signingKey(header.kid);
   const data = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
   const valid = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, base64UrlToBytes(parts[2]), data);
-  return valid && checkClaims(decodeJson(parts[1]));
+  const claims = decodeJson(parts[1]);
+  return valid && checkClaims(claims);
 }

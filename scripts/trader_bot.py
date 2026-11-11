@@ -191,7 +191,8 @@ def actions_id_token():
 def sync_real_positions():
     """Copia las posiciones reales de la base del Worker a trader/real.json (para cifrarlas en el panel)."""
     token = actions_id_token()
-    request = urllib.request.Request(WORKER_STATE_URL, headers={"Authorization": f"Bearer {token}"})
+    headers = {"Authorization": f"Bearer {token}", "User-Agent": "trading-bot/1.0"}
+    request = urllib.request.Request(WORKER_STATE_URL, headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_S) as response:
             state = json.loads(response.read().decode("utf-8"))
