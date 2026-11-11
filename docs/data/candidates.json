@@ -1,38 +1,57 @@
 {
   "generated": "2026-11-11",
   "note": "Candidatos segun una regla de precio. No es una recomendacion personal ni una orden.",
+  "regime": {
+    "state": "normal",
+    "reasons": [],
+    "exposure_factor": 1.0
+  },
+  "usd_per_eur": 1.1092623472213745,
   "candidates": [
     {
-      "symbol": "AMZN",
-      "date": "2026-11-10",
-      "close": 270.87,
-      "stop": 249.52,
-      "invalidation": "cierre bajo 229.36 (minimo de 10 dias) o toque del stop",
-      "growth": "+12.4% interanual"
-    },
-    {
-      "symbol": "MCD",
-      "date": "2026-11-10",
-      "close": 282.17,
-      "stop": 268.32,
-      "invalidation": "cierre bajo 248.00 (minimo de 10 dias) o toque del stop",
-      "growth": "+3.7% interanual"
+      "symbol": "AAPL",
+      "date": "2026-11-11",
+      "close": 355.63,
+      "stop": 336.47,
+      "invalidation": "cierre bajo 325.33 (minimo de 10 dias) o toque del stop",
+      "growth": "no disponible",
+      "size": {
+        "shares": 0.4366,
+        "position_eur": 139.97,
+        "risk_eur": 9.54,
+        "weight": 0.2,
+        "capped": true
+      }
     },
     {
       "symbol": "KO",
-      "date": "2026-11-10",
-      "close": 96.91,
-      "stop": 92.96,
+      "date": "2026-11-11",
+      "close": 97.57,
+      "stop": 93.69,
       "invalidation": "cierre bajo 90.58 (minimo de 10 dias) o toque del stop",
-      "growth": "+1.9% interanual"
+      "growth": "no disponible",
+      "size": {
+        "shares": 1.5916,
+        "position_eur": 140.0,
+        "risk_eur": 7.57,
+        "weight": 0.2,
+        "capped": true
+      }
     },
     {
       "symbol": "DIS",
-      "date": "2026-11-10",
-      "close": 119.21,
-      "stop": 114.08,
+      "date": "2026-11-11",
+      "close": 119.65,
+      "stop": 114.57,
       "invalidation": "cierre bajo 108.75 (minimo de 10 dias) o toque del stop",
-      "growth": "+3.4% interanual"
+      "growth": "no disponible",
+      "size": {
+        "shares": 1.2979,
+        "position_eur": 140.0,
+        "risk_eur": 7.95,
+        "weight": 0.2,
+        "capped": true
+      }
     }
   ]
 }
