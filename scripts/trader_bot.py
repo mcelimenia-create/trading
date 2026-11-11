@@ -8,6 +8,7 @@
 
 Solo lee datos publicos y envia avisos. Nunca envia ordenes a un broker.
 """
+import base64
 import hashlib
 import json
 import os
@@ -189,9 +190,15 @@ def actions_id_token():
 
 def sync_real_positions():
     """Copia las posiciones reales de la base del Worker a trader/real.json (para cifrarlas en el panel)."""
-    request = urllib.request.Request(WORKER_STATE_URL, headers={"Authorization": f"Bearer {actions_id_token()}"})
-    with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_S) as response:
-        state = json.loads(response.read().decode("utf-8"))
+    token = actions_id_token()
+    request = urllib.request.Request(WORKER_STATE_URL, headers={"Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_S) as response:
+            state = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        claims = json.loads(base64.urlsafe_b64decode(token.split(".")[1] + "=="))
+        shown = {key: claims.get(key) for key in ("iss", "aud", "repository", "ref")}
+        raise RuntimeError(f"el Worker rechazo el token ({error.code}): {shown}") from error
     REAL_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 

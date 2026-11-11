@@ -14,13 +14,14 @@ function decodeJson(part) {
   return JSON.parse(new TextDecoder().decode(base64UrlToBytes(part)));
 }
 
-// Comprobaciones de quien pide: emisor, audiencia, repositorio, rama y caducidad.
+// Comprobaciones de quien pide: emisor, audiencia, repositorio, rama y ventana de validez.
 export function checkClaims(claims, now = Date.now() / 1000) {
   return claims.iss === GITHUB_ISSUER
     && claims.aud === AUDIENCE
     && claims.repository === REPOSITORY
     && claims.ref === BRANCH_REF
-    && typeof claims.exp === "number" && claims.exp > now;
+    && typeof claims.exp === "number" && claims.exp > now
+    && (claims.nbf === undefined || claims.nbf <= now);
 }
 
 async function signingKey(kid) {
