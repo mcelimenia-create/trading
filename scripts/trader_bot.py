@@ -26,6 +26,8 @@ TRADER_DIR = ROOT / "trader"
 CONFIG_FILE = ROOT / "config" / "watchlist.json"
 ENV_FILE = ROOT / ".env"
 PAPER_FILE = TRADER_DIR / "paper.json"
+DOCS_DATA_DIR = ROOT / "docs" / "data"
+DASHBOARD_JOBS = {"news", "paper"}
 NEW_YORK = ZoneInfo("America/New_York")
 TELEGRAM_MAX_CHARS = 3500
 HTTP_TIMEOUT_S = 20
@@ -154,6 +156,17 @@ def paper_job(notify):
     paper_trader.paper_job(notify, load_config()["tickers"], PAPER_FILE)
 
 
+def publish_dashboard(job):
+    """Copia el estado de papel y la hora de la ultima ejecucion a docs/data (panel de GitHub Pages)."""
+    DOCS_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    status_path = DOCS_DATA_DIR / "status.json"
+    status = json.loads(status_path.read_text(encoding="utf-8")) if status_path.exists() else {}
+    status[job] = datetime.now(ZoneInfo("UTC")).strftime("%Y-%m-%d %H:%M UTC")
+    status_path.write_text(json.dumps(status, indent=2), encoding="utf-8")
+    if job == "paper" and PAPER_FILE.exists():
+        (DOCS_DATA_DIR / "paper.json").write_text(PAPER_FILE.read_text(encoding="utf-8"), encoding="utf-8")
+
+
 def main(argv):
     jobs = {"news": news_job, "session": session_job, "paper": paper_job}
     if len(argv) != 2 or argv[1] not in jobs:
@@ -171,6 +184,8 @@ def main(argv):
         send_telegram(token, chat_id, text)
 
     jobs[argv[1]](notify)
+    if argv[1] in DASHBOARD_JOBS:
+        publish_dashboard(argv[1])
     return 0
 
 

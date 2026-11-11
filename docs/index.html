@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel del bot de trading</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --text:#1d2330; --muted:#6b7280; --good:#15803d; --bad:#b91c1c; --line:#e5e7eb; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#0f1218; --card:#171c25; --text:#e6e9ef; --muted:#9aa3b2; --good:#4ade80; --bad:#f87171; --line:#262d3a; }
+  }
+  body { margin:0; font-family: -apple-system, system-ui, sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width: 960px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.4rem; margin: 8px 0 4px; }
+  h2 { font-size: 1.05rem; margin: 24px 0 8px; }
+  .muted { color: var(--muted); font-size: .9rem; }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin-top:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; }
+  .label { color: var(--muted); font-size:.8rem; }
+  .value { font-size:1.2rem; font-weight:600; margin-top:4px; }
+  table { width:100%; border-collapse: collapse; background:var(--card); border:1px solid var(--line); border-radius:10px; overflow:hidden; font-size:.9rem; }
+  th, td { padding:8px 10px; text-align:left; border-bottom:1px solid var(--line); }
+  th { color: var(--muted); font-weight:500; }
+  .pos { color: var(--good); } .neg { color: var(--bad); }
+  .empty { padding:12px; color: var(--muted); }
+  .warn { border-left:4px solid #d97706; padding:8px 12px; background:var(--card); border-radius:6px; font-size:.9rem; }
+  .table-wrap { overflow-x:auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Panel del bot de trading</h1>
+  <p class="muted">Cartera de papel: simulación sin dinero real. No es una recomendación personal de compra ni de venta.</p>
+  <p class="warn">Los resultados son simulados y el pasado no garantiza nada. Si la regla pierde, la tabla lo muestra igual.</p>
+
+  <h2>Estado del bot</h2>
+  <div id="status" class="card muted">Cargando…</div>
+
+  <h2>Resumen de la cartera de papel</h2>
+  <div class="grid" id="summary"></div>
+
+  <h2>Señales pendientes de entrada</h2>
+  <div class="table-wrap"><table id="pending"></table></div>
+
+  <h2>Posiciones abiertas</h2>
+  <div class="table-wrap"><table id="open"></table></div>
+
+  <h2>Operaciones cerradas</h2>
+  <div class="table-wrap"><table id="closed"></table></div>
+
+  <p class="muted" id="updated"></p>
+</main>
+
+<script>
+const fmtPct = (x) => (x * 100).toFixed(2) + "%";
+const cls = (x) => (x >= 0 ? "pos" : "neg");
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function table(el, headers, rows, emptyText) {
+  if (!rows.length) { el.innerHTML = `<tr><td class="empty">${emptyText}</td></tr>`; return; }
+  el.innerHTML = "<tr>" + headers.map((h) => `<th>${h}</th>`).join("") + "</tr>" +
+    rows.map((r) => "<tr>" + r.map((c) => `<td>${c}</td>`).join("") + "</tr>").join("");
+}
+
+function stats(closed) {
+  if (!closed.length) return null;
+  const rets = closed.map((c) => c.ret);
+  const wins = rets.filter((r) => r > 0);
+  const losses = rets.filter((r) => r <= 0);
+  const factor = losses.length ? wins.reduce((a, b) => a + b, 0) / Math.abs(losses.reduce((a, b) => a + b, 0)) : null;
+  const mean = rets.reduce((a, b) => a + b, 0) / rets.length;
+  return { n: rets.length, hit: wins.length / rets.length, mean, factor };
+}
+
+async function getJSON(path) {
+  const res = await fetch(path + "?t=" + Date.now());
+  if (!res.ok) throw new Error(path + " " + res.status);
+  return res.json();
+}
+
+async function load() {
+  try {
+    const status = await getJSON("data/status.json").catch(() => ({}));
+    const jobs = Object.entries(status).map(([job, at]) => `${esc(job)}: ${esc(at)}`);
+    document.getElementById("status").innerHTML = jobs.length
+      ? "Última ejecución por tipo<br>" + jobs.join("<br>")
+      : "Todavía no hay ejecuciones registradas.";
+
+    const state = await getJSON("data/paper.json").catch(() => ({ pending: [], positions: [], closed: [] }));
+    const s = stats(state.closed || []);
+    const summary = [
+      ["Operaciones cerradas", s ? s.n : 0],
+      ["Acierto", s ? fmtPct(s.hit) : "-"],
+      ["Media por operación", s ? `<span class="${cls(s.mean)}">${fmtPct(s.mean)}</span>` : "-"],
+      ["Factor de beneficio", s && s.factor !== null ? s.factor.toFixed(2) : "-"],
+      ["Posiciones abiertas", (state.positions || []).length],
+      ["Señales pendientes", (state.pending || []).length],
+    ];
+    document.getElementById("summary").innerHTML = summary.map(([l, v]) =>
+      `<div class="card"><div class="label">${l}</div><div class="value">${v}</div></div>`).join("");
+
+    table(document.getElementById("pending"), ["Valor", "Día de señal", "Cierre", "Stop orientativo"],
+      (state.pending || []).map((p) => [esc(p.symbol), esc(p.signal_date), p.signal_close.toFixed(2), p.stop_estimate.toFixed(2)]),
+      "No hay señales pendientes.");
+
+    table(document.getElementById("open"), ["Valor", "Entrada", "Precio entrada", "Stop", "Tamaño de referencia"],
+      (state.positions || []).map((p) => [esc(p.symbol), esc(p.entry_date), p.entry.toFixed(2), p.stop.toFixed(2), fmtPct(p.weight)]),
+      "No hay posiciones abiertas.");
+
+    table(document.getElementById("closed"), ["Valor", "Entrada", "Salida", "Motivo", "Precio salida", "Resultado"],
+      (state.closed || []).slice().reverse().map((c) => [esc(c.symbol), esc(c.entry_date), esc(c.exit_date), esc(c.reason),
+        c.exit.toFixed(2), `<span class="${cls(c.ret)}">${fmtPct(c.ret)}</span>`]),
+      "Todavía no hay operaciones cerradas.");
+
+    document.getElementById("updated").textContent = "Página cargada: " + new Date().toLocaleString("es-ES");
+  } catch (err) {
+    document.getElementById("status").textContent = "No se pudieron cargar los datos: " + err.message;
+  }
+}
+load();
+</script>
+</body>
+</html>
