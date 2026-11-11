@@ -2,12 +2,13 @@ name: trader-bot
 
 on:
   schedule:
-    - cron: "0 7,13,18,21 * * *"   # noticias, varias veces al dia (UTC)
+    # Minutos distintos para que dos tareas programadas no coincidan: GitHub descarta la que espera.
+    - cron: "5 7,13,18,21 * * *"   # noticias, varias veces al dia (UTC)
     - cron: "*/15 13-21 * * 1-5"   # sesion de mercado, dias laborables (UTC)
-    - cron: "30 21 * * 1-5"        # cartera de papel, tras el cierre (UTC)
-    - cron: "45 21 * * 1-5"        # candidatos de medio plazo, tras el cierre (UTC)
+    - cron: "35 21 * * 1-5"        # cartera de papel, tras el cierre (UTC)
+    - cron: "50 21 * * 1-5"        # candidatos de medio plazo, tras el cierre (UTC)
     - cron: "0 22 * * 5"           # escaner de EEUU, cada viernes (UTC)
-    - cron: "*/15 * * * *"         # Telegram: tus mensajes y seguimiento de posiciones reales
+    - cron: "7,22,37,52 * * * *"   # Telegram: tus mensajes y seguimiento de posiciones reales
   workflow_dispatch:
     inputs:
       job:
@@ -28,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      JOB: ${{ github.event_name == 'workflow_dispatch' && inputs.job || github.event.schedule == '*/15 13-21 * * 1-5' && 'session' || github.event.schedule == '30 21 * * 1-5' && 'paper' || github.event.schedule == '45 21 * * 1-5' && 'candidates' || github.event.schedule == '0 22 * * 5' && 'scan' || github.event.schedule == '*/15 * * * *' && 'telegram' || 'news' }}
+      JOB: ${{ github.event_name == 'workflow_dispatch' && inputs.job || github.event.schedule == '*/15 13-21 * * 1-5' && 'session' || github.event.schedule == '35 21 * * 1-5' && 'paper' || github.event.schedule == '50 21 * * 1-5' && 'candidates' || github.event.schedule == '0 22 * * 5' && 'scan' || github.event.schedule == '7,22,37,52 * * * *' && 'telegram' || 'news' }}
     steps:
       - uses: actions/checkout@v4
 
