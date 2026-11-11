@@ -4,6 +4,7 @@ import { runScheduled } from "./cron.js";
 import { marketContext, todayNewYork } from "./context.js";
 import { PORTFOLIO } from "./config.js";
 import { fetchBars } from "./market.js";
+import { verifyActionsToken } from "./oidc.js";
 import { loadState, saveState } from "./store.js";
 import { sendMessage } from "./telegram.js";
 
@@ -33,12 +34,14 @@ async function processText(text, env) {
   return result.reply;
 }
 
-// Estado de las posiciones reales para la copia de GitHub (lo lee el job session).
-function serveState(request, env) {
-  if (request.headers.get("Authorization") !== `Bearer ${env.SYNC_TOKEN}`) {
+// Estado de las posiciones reales para la copia de GitHub (lo lee el job session con su token OIDC).
+async function serveState(request, env) {
+  const auth = request.headers.get("Authorization") ?? "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!token || !(await verifyActionsToken(token).catch(() => false))) {
     return new Response("forbidden", { status: 403 });
   }
-  return loadState(env.DB).then((state) => Response.json(state));
+  return Response.json(await loadState(env.DB));
 }
 
 export default {

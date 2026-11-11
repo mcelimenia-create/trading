@@ -36,6 +36,7 @@ PAPER_FILE = TRADER_DIR / "paper.json"
 REAL_FILE = TRADER_DIR / "real.json"
 EARNINGS_FILE = TRADER_DIR / "earnings_alerted.json"
 WORKER_STATE_URL = "https://trading-bot.mcelimen-ia.workers.dev/state"
+WORKER_AUDIENCE = "trading-bot-worker"
 REAL_DIGEST_FILE = TRADER_DIR / "real_published.sha256"
 REAL_PUBLIC_FILE = ROOT / "docs" / "data" / "real.enc"
 CANDIDATE_CONFIG = ROOT / "config" / "candidates.json"
@@ -175,12 +176,20 @@ def watch_day_trade(ticker, notify):
         notify(f"OPERACION 1 DIA - SALIDA / AVISO {ticker}\n\n{result.stdout}")
 
 
+def actions_id_token():
+    """Token OIDC de este job: el Worker comprueba que viene de este repositorio y de main."""
+    url = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_URL", "")
+    bearer = os.environ.get("ACTIONS_ID_TOKEN_REQUEST_TOKEN", "")
+    if not url or not bearer:
+        raise RuntimeError("falta el token OIDC de GitHub (permiso id-token: write en el workflow)")
+    request = urllib.request.Request(f"{url}&audience={WORKER_AUDIENCE}", headers={"Authorization": f"Bearer {bearer}"})
+    with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_S) as response:
+        return json.loads(response.read().decode("utf-8"))["value"]
+
+
 def sync_real_positions():
     """Copia las posiciones reales de la base del Worker a trader/real.json (para cifrarlas en el panel)."""
-    token = os.environ.get("SYNC_TOKEN", "")
-    if not token:
-        raise RuntimeError("falta SYNC_TOKEN: no puedo leer las posiciones reales del Worker")
-    request = urllib.request.Request(WORKER_STATE_URL, headers={"Authorization": f"Bearer {token}"})
+    request = urllib.request.Request(WORKER_STATE_URL, headers={"Authorization": f"Bearer {actions_id_token()}"})
     with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_S) as response:
         state = json.loads(response.read().decode("utf-8"))
     REAL_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
