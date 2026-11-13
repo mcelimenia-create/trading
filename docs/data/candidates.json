@@ -1,11 +1,44 @@
 {
-  "generated": "2026-11-12",
+  "generated": "2026-11-13",
   "note": "Candidatos segun una regla de precio. No es una recomendacion personal ni una orden.",
   "regime": {
-    "state": "normal",
-    "reasons": [],
-    "exposure_factor": 1.0
+    "state": "riesgo",
+    "reasons": [
+      "QQQ por debajo de su media de 200 sesiones"
+    ],
+    "exposure_factor": 0.5
   },
-  "usd_per_eur": 1.1058276891708374,
-  "candidates": []
+  "usd_per_eur": 1.102292776107788,
+  "candidates": [
+    {
+      "symbol": "AAPL",
+      "date": "2026-11-13",
+      "close": 356.27,
+      "stop": 337.36,
+      "invalidation": "cierre bajo 325.33 (minimo de 10 dias) o toque del stop",
+      "growth": "no disponible",
+      "size": {
+        "shares": 0.2165,
+        "position_eur": 69.97,
+        "risk_eur": 5.71,
+        "weight": 0.1,
+        "capped": true
+      }
+    },
+    {
+      "symbol": "KO",
+      "date": "2026-11-13",
+      "close": 99.25,
+      "stop": 95.48,
+      "invalidation": "cierre bajo 93.00 (minimo de 10 dias) o toque del stop",
+      "growth": "no disponible",
+      "size": {
+        "shares": 0.7774,
+        "position_eur": 70.0,
+        "risk_eur": 4.66,
+        "weight": 0.1,
+        "capped": true
+      }
+    }
+  ]
 }
