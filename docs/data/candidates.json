@@ -1,29 +1,14 @@
 {
-  "generated": "2026-11-16",
+  "generated": "2026-11-17",
   "note": "Candidatos segun una regla de precio. No es una recomendacion personal ni una orden.",
   "regime": {
     "state": "riesgo",
     "reasons": [
-      "QQQ por debajo de su media de 200 sesiones"
+      "QQQ por debajo de su media de 200 sesiones",
+      "VIX en 25.5, por encima de 25"
     ],
     "exposure_factor": 0.5
   },
-  "usd_per_eur": 1.1001100540161133,
-  "candidates": [
-    {
-      "symbol": "KO",
-      "date": "2026-11-16",
-      "close": 99.48,
-      "stop": 95.8,
-      "invalidation": "cierre bajo 93.00 (minimo de 10 dias) o toque del stop",
-      "growth": "no disponible",
-      "size": {
-        "shares": 0.7741,
-        "position_eur": 70.0,
-        "risk_eur": 4.59,
-        "weight": 0.1,
-        "capped": true
-      }
-    }
-  ]
+  "usd_per_eur": 1.100473165512085,
+  "candidates": []
 }
