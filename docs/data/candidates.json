@@ -1,14 +1,30 @@
 {
-  "generated": "2026-11-17",
+  "generated": "2026-11-18",
   "note": "Candidatos segun una regla de precio. No es una recomendacion personal ni una orden.",
   "regime": {
     "state": "riesgo",
     "reasons": [
-      "QQQ por debajo de su media de 200 sesiones",
-      "VIX en 25.5, por encima de 25"
+      "SPY por debajo de su media de 200 sesiones",
+      "QQQ por debajo de su media de 200 sesiones"
     ],
     "exposure_factor": 0.5
   },
-  "usd_per_eur": 1.100473165512085,
-  "candidates": []
+  "usd_per_eur": 1.0976948738098145,
+  "candidates": [
+    {
+      "symbol": "DIS",
+      "date": "2026-11-18",
+      "close": 122.36,
+      "stop": 115.77,
+      "invalidation": "cierre bajo 113.79 (minimo de 10 dias) o toque del stop",
+      "growth": "no disponible",
+      "size": {
+        "shares": 0.6279,
+        "position_eur": 69.99,
+        "risk_eur": 5.77,
+        "weight": 0.1,
+        "capped": true
+      }
+    }
+  ]
 }
