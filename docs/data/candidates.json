@@ -1,15 +1,15 @@
 {
-  "generated": "2026-11-19",
+  "generated": "2026-11-20",
   "note": "Candidatos segun una regla de precio. No es una recomendacion personal ni una orden.",
   "regime": {
     "state": "riesgo",
     "reasons": [
       "SPY por debajo de su media de 200 sesiones",
       "QQQ por debajo de su media de 200 sesiones",
-      "VIX en 28.4, por encima de 25"
+      "VIX en 35.9, por encima de 25"
     ],
     "exposure_factor": 0.5
   },
-  "usd_per_eur": 1.0972130298614502,
+  "usd_per_eur": 1.0967316627502441,
   "candidates": []
 }
