@@ -1,5 +1,12 @@
 {
-  "pending": [],
+  "pending": [
+    {
+      "symbol": "GLOB",
+      "signal_date": "2026-11-24",
+      "signal_close": 50.04999923706055,
+      "stop_estimate": 44.5430417742048
+    }
+  ],
   "positions": [
     {
       "symbol": "AAPL",
@@ -8,8 +15,8 @@
       "entry": 357.7099914550781,
       "stop": 338.5456978934152,
       "weight": 0.2,
-      "last_close": 349.0799865722656,
-      "last_date": "2026-11-23"
+      "last_close": 354.07000732421875,
+      "last_date": "2026-11-24"
     },
     {
       "symbol": "KO",
@@ -18,8 +25,8 @@
       "entry": 98.25,
       "stop": 94.36857386997768,
       "weight": 0.2,
-      "last_close": 95.87999725341797,
-      "last_date": "2026-11-23"
+      "last_close": 97.62000274658203,
+      "last_date": "2026-11-24"
     },
     {
       "symbol": "DIS",
@@ -28,8 +35,8 @@
       "entry": 119.52999877929688,
       "stop": 114.44571358816964,
       "weight": 0.2,
-      "last_close": 120.2699966430664,
-      "last_date": "2026-11-23"
+      "last_close": 122.51000213623047,
+      "last_date": "2026-11-24"
     }
   ],
   "closed": []
