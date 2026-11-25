@@ -1,10 +1,10 @@
 {
   "pending": [
     {
-      "symbol": "GLOB",
-      "signal_date": "2026-11-24",
-      "signal_close": 50.04999923706055,
-      "stop_estimate": 44.5430417742048
+      "symbol": "MCD",
+      "signal_date": "2026-11-25",
+      "signal_close": 283.5,
+      "stop_estimate": 270.50213623046875
     }
   ],
   "positions": [
@@ -15,8 +15,8 @@
       "entry": 357.7099914550781,
       "stop": 338.5456978934152,
       "weight": 0.2,
-      "last_close": 354.07000732421875,
-      "last_date": "2026-11-24"
+      "last_close": 355.5799865722656,
+      "last_date": "2026-11-25"
     },
     {
       "symbol": "KO",
@@ -25,8 +25,8 @@
       "entry": 98.25,
       "stop": 94.36857386997768,
       "weight": 0.2,
-      "last_close": 97.62000274658203,
-      "last_date": "2026-11-24"
+      "last_close": 97.58999633789062,
+      "last_date": "2026-11-25"
     },
     {
       "symbol": "DIS",
@@ -35,8 +35,18 @@
       "entry": 119.52999877929688,
       "stop": 114.44571358816964,
       "weight": 0.2,
-      "last_close": 122.51000213623047,
-      "last_date": "2026-11-24"
+      "last_close": 125.5999984741211,
+      "last_date": "2026-11-25"
+    },
+    {
+      "symbol": "GLOB",
+      "signal_date": "2026-11-24",
+      "entry_date": "2026-11-25",
+      "entry": 50.22999954223633,
+      "stop": 44.722999572753906,
+      "weight": 0.18242237087557936,
+      "last_close": 50.189998626708984,
+      "last_date": "2026-11-25"
     }
   ],
   "closed": []
