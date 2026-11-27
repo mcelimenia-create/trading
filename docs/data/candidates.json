@@ -1,58 +1,57 @@
 {
-  "generated": "2026-11-26",
+  "generated": "2026-11-27",
   "note": "Candidatos segun una regla de precio. No es una recomendacion personal ni una orden.",
   "regime": {
     "state": "riesgo",
     "reasons": [
       "SPY por debajo de su media de 200 sesiones",
-      "QQQ por debajo de su media de 200 sesiones",
-      "VIX en 26.8, por encima de 25"
+      "QQQ por debajo de su media de 200 sesiones"
     ],
     "exposure_factor": 0.5
   },
-  "usd_per_eur": 1.0972130298614502,
+  "usd_per_eur": 1.0934937000274658,
   "candidates": [
     {
-      "symbol": "MCD",
-      "date": "2026-11-25",
-      "close": 283.5,
-      "stop": 270.5,
-      "invalidation": "cierre bajo 267.47 (minimo de 10 dias) o toque del stop",
+      "symbol": "GLOB",
+      "date": "2026-11-27",
+      "close": 51.4,
+      "stop": 46.15,
+      "invalidation": "cierre bajo 39.12 (minimo de 10 dias) o toque del stop",
       "growth": "no disponible",
       "size": {
-        "shares": 0.2709,
-        "position_eur": 70.0,
-        "risk_eur": 5.21,
+        "shares": 1.2504,
+        "position_eur": 58.78,
+        "risk_eur": 8.0,
+        "weight": 0.084,
+        "capped": false
+      }
+    },
+    {
+      "symbol": "AAPL",
+      "date": "2026-11-27",
+      "close": 358.54,
+      "stop": 342.99,
+      "invalidation": "cierre bajo 340.56 (minimo de 10 dias) o toque del stop",
+      "growth": "no disponible",
+      "size": {
+        "shares": 0.2134,
+        "position_eur": 69.97,
+        "risk_eur": 5.03,
         "weight": 0.1,
         "capped": true
       }
     },
     {
-      "symbol": "GLOB",
-      "date": "2026-11-25",
-      "close": 50.19,
-      "stop": 44.82,
-      "invalidation": "cierre bajo 39.12 (minimo de 10 dias) o toque del stop",
-      "growth": "no disponible",
-      "size": {
-        "shares": 1.2251,
-        "position_eur": 56.04,
-        "risk_eur": 8.0,
-        "weight": 0.0801,
-        "capped": false
-      }
-    },
-    {
       "symbol": "DIS",
-      "date": "2026-11-25",
-      "close": 125.6,
-      "stop": 118.73,
+      "date": "2026-11-27",
+      "close": 127.24,
+      "stop": 120.65,
       "invalidation": "cierre bajo 116.13 (minimo de 10 dias) o toque del stop",
       "growth": "no disponible",
       "size": {
-        "shares": 0.6115,
-        "position_eur": 70.0,
-        "risk_eur": 5.83,
+        "shares": 0.6015,
+        "position_eur": 69.99,
+        "risk_eur": 5.62,
         "weight": 0.1,
         "capped": true
       }
